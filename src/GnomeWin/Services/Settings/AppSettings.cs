@@ -60,7 +60,6 @@ public sealed class GeneralSettings : ObservableObject
     public bool ShowTopBar { get => _showTopBar; set => Set(ref _showTopBar, value); }
     public bool FirstRunDone { get => _firstRunDone; set => Set(ref _firstRunDone, value); }
     public bool VerboseLogging { get => _verboseLogging; set => Set(ref _verboseLogging, value); }
-    /// <summary>All WPF rendering in software (no Direct3D device kept in memory, ~20 MB less). Applied at start.</summary>
     public bool LowMemoryMode { get => _lowMemory; set => Set(ref _lowMemory, value); }
 }
 
@@ -118,7 +117,6 @@ public sealed class OverviewSettings : ObservableObject
     public bool SearchCalculator { get => _searchCalculator; set => Set(ref _searchCalculator, value); }
     public bool LivePreviews { get => _livePreviews; set => Set(ref _livePreviews, value); }
     public bool ShowWorkspaceStrip { get => _showWorkspaceStrip; set => Set(ref _showWorkspaceStrip, value); }
-    /// <summary>GNOME hot corner: touching the top-left corner opens the Overview.</summary>
     public bool HotCorner { get => _hotCorner; set => Set(ref _hotCorner, value); }
 }
 
@@ -134,7 +132,6 @@ public sealed class WorkspaceSettings : ObservableObject
     public int InitialCount { get => _initialCount; set => Set(ref _initialCount, Math.Clamp(value, 1, 16)); }
     public bool ShowSwitchOsd { get => _showOsd; set => Set(ref _showOsd, value); }
     public bool WrapAround { get => _wrapAround; set => Set(ref _wrapAround, value); }
-    /// <summary>Super+Tab only lists applications of the current workspace (GNOME "App Switching").</summary>
     public bool SwitcherCurrentWorkspaceOnly { get => _switcherCurrentOnly; set => Set(ref _switcherCurrentOnly, value); }
 }
 

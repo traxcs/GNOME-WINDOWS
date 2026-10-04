@@ -21,12 +21,6 @@ using WpfEllipse = System.Windows.Shapes.Ellipse;
 
 namespace GnomeWin.Shell.Settings;
 
-/// <summary>
-/// Settings application reproducing GNOME Settings (GNOME 47, libadwaita): integrated header bar,
-/// searchable sidebar with the same panels, boxed-list preference groups. Shell options live in
-/// the matching GNOME panel; system matters that Windows already handles open Windows Settings.
-/// Changes apply immediately.
-/// </summary>
 public sealed class SettingsWindow : Window
 {
     private sealed record PanelDef(string Id, string Fr, string En, string Glyph, string Keywords, Func<UIElement> Build);
@@ -66,7 +60,6 @@ public sealed class SettingsWindow : Window
         FontSize = 14;
         TextOptions.SetTextFormattingMode(this, TextFormattingMode.Display);
         Icon = System.Windows.Media.Imaging.BitmapFrame.Create(new Uri("pack://application:,,,/GnomeWin;component/Assets/GnomeWin.ico"));
-        // Client-side decorations like libadwaita: the header bar is part of the content.
         WindowChrome.SetWindowChrome(this, new WindowChrome
         {
             CaptionHeight = 46,
@@ -129,14 +122,12 @@ public sealed class SettingsWindow : Window
         NativeMethods.DwmSetWindowAttribute(h, NativeMethods.DWMWA_WINDOW_CORNER_PREFERENCE, ref round, sizeof(int));
     }
 
-    // ================================================================== layout
     private UIElement BuildLayout()
     {
         var root = new Grid();
         root.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(270) });
         root.ColumnDefinitions.Add(new ColumnDefinition());
 
-        // ---- sidebar
         var side = new DockPanel();
         side.SetResourceReference(System.Windows.Controls.Panel.BackgroundProperty, "Brush.SidebarBg");
         var sideHeader = new Grid { Height = 46 };
@@ -173,7 +164,6 @@ public sealed class SettingsWindow : Window
         WindowChrome.SetIsHitTestVisibleInChrome(menuBtn, true);
         root.Children.Add(side);
 
-        // ---- content
         var main = new DockPanel();
         Grid.SetColumn(main, 1);
         var header = new Grid { Height = 46 };
@@ -230,7 +220,6 @@ public sealed class SettingsWindow : Window
     {
         var p = _panels.First(x => x.Id == id);
         _pageTitle.Text = Loc.IsFrench ? p.Fr : p.En;
-        // libadwaita "clamp": content centred, at most ~640 px wide.
         var clamp = new StackPanel { MaxWidth = 640, Margin = new Thickness(24, 12, 24, 36) };
         clamp.Children.Add(p.Build());
         _content.Content = clamp;
@@ -281,7 +270,6 @@ public sealed class SettingsWindow : Window
 
     private Button WindowButton(string glyph, Action click)
     {
-        // libadwaita window controls: small round grey buttons.
         var b = new Button { Content = glyph, Width = 24, Height = 24, FontSize = 8, Margin = new Thickness(8, 0, 0, 0) };
         b.SetResourceReference(StyleProperty, "RoundIconButton");
         b.Click += (_, _) => click();
@@ -289,7 +277,6 @@ public sealed class SettingsWindow : Window
         return b;
     }
 
-    // ================================================================== row builders (AdwPreferencesGroup / rows)
     private static string L(string fr, string en) => Loc.IsFrench ? fr : en;
 
     private static UIElement Group(string? title, string? description, params UIElement[] rows)
@@ -323,7 +310,6 @@ public sealed class SettingsWindow : Window
         return panel;
     }
 
-    /// <summary>A preferences group whose content is free (style thumbnails).</summary>
     private static UIElement GroupBox(string title, UIElement content)
     {
         var card = new Border { CornerRadius = new CornerRadius(12), Child = content };
@@ -382,7 +368,6 @@ public sealed class SettingsWindow : Window
         return false;
     }
 
-    /// <summary>AdwSwitchRow: the whole row toggles the switch.</summary>
     private static UIElement SwitchRow(string title, string? subtitle, object source, string path)
     {
         var sw = new CheckBox();
@@ -407,7 +392,6 @@ public sealed class SettingsWindow : Window
         return row;
     }
 
-    /// <summary>AdwComboRow.</summary>
     private static UIElement ComboRow<T>(string title, string? subtitle, object source, string path, params (T Value, string Fr, string En)[] options) where T : struct, Enum
     {
         var c = new ComboBox { MinWidth = 170 };
@@ -433,7 +417,6 @@ public sealed class SettingsWindow : Window
         return RowShell(title, subtitle, panel);
     }
 
-    /// <summary>Navigation / external row with a trailing arrow.</summary>
     private static UIElement LinkRow(string title, string? subtitle, Action click, bool external = true)
     {
         var arrow = new TextBlock { Text = external ? "" : "", FontSize = 12 };
@@ -477,7 +460,6 @@ public sealed class SettingsWindow : Window
         return p;
     }
 
-    /// <summary>Row with a radio button prefix (AdwActionRow + GtkCheckButton in a group).</summary>
     private static UIElement RadioRow(string group, string title, string? subtitle, bool isChecked, Action selected)
     {
         var rb = new RadioButton { IsChecked = isChecked, GroupName = group, Focusable = false };
@@ -489,7 +471,6 @@ public sealed class SettingsWindow : Window
         return row;
     }
 
-    // ================================================================== panels
     private UIElement BuildWifi()
     {
         _status?.EnsureDetails();
@@ -604,7 +585,6 @@ public sealed class SettingsWindow : Window
                    "Workspaces are Windows virtual desktops: Task View and Ctrl+Win+Arrows stay consistent.")));
     }
 
-    // ---------------------------------------------------------------- Appearance (GNOME 47 layout)
     private UIElement BuildAppearance()
     {
         var g = _settings.Current.General;
@@ -721,7 +701,6 @@ public sealed class SettingsWindow : Window
         return grid;
     }
 
-    // ---------------------------------------------------------------- Dock (Ubuntu "Desktop" panel layout)
     private UIElement BuildDock()
     {
         var d = _settings.Current.Dock;
@@ -818,7 +797,6 @@ public sealed class SettingsWindow : Window
                 WinLink(L("Loupe", "Magnifier"), "ms-settings:easeofaccess-magnifier")));
     }
 
-    // ---------------------------------------------------------------- Keyboard (GNOME "Keyboard Shortcuts")
     private UIElement BuildKeyboard()
     {
         var k = _settings.Current.Keyboard;
@@ -910,7 +888,6 @@ public sealed class SettingsWindow : Window
         return b;
     }
 
-    // ---------------------------------------------------------------- System
     private UIElement BuildSystem()
     {
         var g = _settings.Current.General;

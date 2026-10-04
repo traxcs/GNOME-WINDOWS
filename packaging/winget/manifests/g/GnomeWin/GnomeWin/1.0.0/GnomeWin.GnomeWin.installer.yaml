@@ -20,7 +20,7 @@ AppsAndFeaturesEntries:
     DisplayVersion: 1.0.0
 Installers:
   - Architecture: x64
-    InstallerUrl: https://github.com/OWNER/GnomeWin/releases/download/v1.0.0/GnomeWin-Setup.exe
+    InstallerUrl: https://github.com/traxcs/GNOME-WINDOWS/releases/download/v1.0.0/GnomeWin-Setup.exe
     InstallerSha256: 416B8DF6838408BD99658FE4FA5D860DF7F6BA39623DB15CB5F747B42696B767
 ManifestType: installer
 ManifestVersion: 1.6.0

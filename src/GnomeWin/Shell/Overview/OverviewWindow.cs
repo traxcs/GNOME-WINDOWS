@@ -44,7 +44,7 @@ public sealed class OverviewWindow : ShellWindow
     {
         Monitor = monitor;
         IsPrimarySurface = primary;
-        PreferSoftwareRendering = false; // full-screen animations: GPU rendering
+        PreferSoftwareRendering = false;
         Title = "GnomeWin Overview";
         Background = Brushes.Black;
 

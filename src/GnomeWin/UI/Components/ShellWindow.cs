@@ -34,11 +34,6 @@ public class ShellWindow : Window
 
     public IntPtr Handle { get; private set; }
 
-    /// <summary>
-    /// Static surfaces (top bar, dock, popups) are drawn by WPF's software renderer: no Direct3D
-    /// device has to stay in memory while the shell rests (~20 MB less). Animated surfaces
-    /// (Overview) set this to false to keep GPU rendering.
-    /// </summary>
     protected bool PreferSoftwareRendering { get; set; } = true;
 
     public static void UseSoftwareRendering(Window w)

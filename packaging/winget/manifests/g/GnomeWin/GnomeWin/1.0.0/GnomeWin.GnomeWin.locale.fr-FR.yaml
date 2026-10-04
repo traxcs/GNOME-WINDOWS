@@ -2,9 +2,9 @@
 PackageIdentifier: GnomeWin.GnomeWin
 PackageVersion: 1.0.0
 PackageLocale: fr-FR
-Publisher: GnomeWin
+Publisher: traxcs
 PackageName: GnomeWin
-
+PackageUrl: https://github.com/traxcs/GNOME-WINDOWS
 License: MIT
 ShortDescription: L'expérience GNOME Shell / Ubuntu pour Windows 11 (vue d'ensemble, dock, espaces de travail).
 Description: |-
