@@ -1,0 +1,141 @@
+<UserControl x:Class="GnomeWin.Shell.Dock.DockView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:dock="clr-namespace:GnomeWin.Shell.Dock"
+             x:Name="Root" AllowDrop="True" Focusable="False">
+    <UserControl.Resources>
+        <SolidColorBrush x:Key="DockHover" Color="#1FFFFFFF" />
+        <SolidColorBrush x:Key="DockActive" Color="#33FFFFFF" />
+        <Style x:Key="DotPanel" TargetType="ItemsControl">
+            <Setter Property="Focusable" Value="False" />
+            <Setter Property="IsHitTestVisible" Value="False" />
+            <Setter Property="ItemTemplate">
+                <Setter.Value>
+                    <DataTemplate>
+                        <Ellipse Width="4" Height="4" Margin="1.5" Fill="{DynamicResource Brush.Indicator}" />
+                    </DataTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </UserControl.Resources>
+
+    <Border x:Name="Panel" CornerRadius="18" Padding="4" Background="{Binding DockBackground, ElementName=Root}"
+            BorderBrush="#1AFFFFFF" BorderThickness="1">
+        <DockPanel x:Name="Layout" LastChildFill="True">
+            <!-- Show Applications (Ubuntu: last position, 3x3 dots) -->
+            <Grid x:Name="ShowApps" DockPanel.Dock="Bottom" Background="Transparent" Margin="1"
+                  Width="{Binding ItemSize, ElementName=Root}" Height="{Binding ItemSize, ElementName=Root}"
+                  ToolTipService.InitialShowDelay="350" Cursor="Hand">
+                <Border x:Name="ShowAppsHighlight" CornerRadius="10" Margin="2" Background="Transparent" />
+                <UniformGrid Rows="3" Columns="3" Width="18" Height="18" HorizontalAlignment="Center" VerticalAlignment="Center" IsHitTestVisible="False">
+                    <Ellipse Width="3.5" Height="3.5" Fill="{DynamicResource Brush.DockFg}" />
+                    <Ellipse Width="3.5" Height="3.5" Fill="{DynamicResource Brush.DockFg}" />
+                    <Ellipse Width="3.5" Height="3.5" Fill="{DynamicResource Brush.DockFg}" />
+                    <Ellipse Width="3.5" Height="3.5" Fill="{DynamicResource Brush.DockFg}" />
+                    <Ellipse Width="3.5" Height="3.5" Fill="{DynamicResource Brush.DockFg}" />
+                    <Ellipse Width="3.5" Height="3.5" Fill="{DynamicResource Brush.DockFg}" />
+                    <Ellipse Width="3.5" Height="3.5" Fill="{DynamicResource Brush.DockFg}" />
+                    <Ellipse Width="3.5" Height="3.5" Fill="{DynamicResource Brush.DockFg}" />
+                    <Ellipse Width="3.5" Height="3.5" Fill="{DynamicResource Brush.DockFg}" />
+                </UniformGrid>
+            </Grid>
+
+            <ItemsControl x:Name="ItemsHost" Focusable="False">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <StackPanel Orientation="{Binding Orientation, ElementName=Root}" />
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate DataType="{x:Type dock:DockItemViewModel}">
+                        <Grid x:Name="Item" Background="Transparent" Margin="1"
+                              Width="{Binding ItemSize, ElementName=Root}" Height="{Binding ItemSize, ElementName=Root}"
+                              ToolTipService.InitialShowDelay="350" ToolTip="{Binding Name}">
+                            <Border x:Name="Highlight" CornerRadius="10" Margin="2" Background="Transparent" />
+                            <Border x:Name="DropMarker" Width="3" HorizontalAlignment="Left" Margin="-3,6,0,6"
+                                    CornerRadius="2" Background="{DynamicResource Brush.Accent}" Visibility="Collapsed" />
+                            <Image x:Name="Icon" Source="{Binding Icon}" RenderOptions.BitmapScalingMode="HighQuality"
+                                   Width="{Binding IconSize, ElementName=Root}" Height="{Binding IconSize, ElementName=Root}"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center" RenderTransformOrigin="0.5,0.5">
+                                <Image.RenderTransform>
+                                    <ScaleTransform x:Name="Zoom" ScaleX="1" ScaleY="1" />
+                                </Image.RenderTransform>
+                            </Image>
+                            <!-- Running indicators: under the icon (horizontal dock) or along the screen edge (vertical dock) -->
+                            <ItemsControl x:Name="DotsBottom" ItemsSource="{Binding Dots}" Style="{StaticResource DotPanel}"
+                                          HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,1">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate><StackPanel Orientation="Horizontal" /></ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                            </ItemsControl>
+                            <ItemsControl x:Name="DotsSide" ItemsSource="{Binding Dots}" Style="{StaticResource DotPanel}"
+                                          HorizontalAlignment="Left" VerticalAlignment="Center" Margin="-3,0,0,0" Visibility="Collapsed">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate><StackPanel Orientation="Vertical" /></ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                            </ItemsControl>
+                        </Grid>
+                        <DataTemplate.Triggers>
+                            <DataTrigger Binding="{Binding IsActive}" Value="True">
+                                <Setter TargetName="Highlight" Property="Background" Value="{StaticResource DockActive}" />
+                            </DataTrigger>
+                            <Trigger SourceName="Item" Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Highlight" Property="Background" Value="{StaticResource DockHover}" />
+                            </Trigger>
+                            <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                                <Setter TargetName="Highlight" Property="Background" Value="{StaticResource DockActive}" />
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding IsDropTarget}" Value="True">
+                                <Setter TargetName="DropMarker" Property="Visibility" Value="Visible" />
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding IndicatorSide, ElementName=Root}" Value="Left">
+                                <Setter TargetName="DotsBottom" Property="Visibility" Value="Collapsed" />
+                                <Setter TargetName="DotsSide" Property="Visibility" Value="Visible" />
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding IndicatorSide, ElementName=Root}" Value="Right">
+                                <Setter TargetName="DotsBottom" Property="Visibility" Value="Collapsed" />
+                                <Setter TargetName="DotsSide" Property="Visibility" Value="Visible" />
+                                <Setter TargetName="DotsSide" Property="HorizontalAlignment" Value="Right" />
+                                <Setter TargetName="DotsSide" Property="Margin" Value="0,0,-3,0" />
+                            </DataTrigger>
+                            <MultiDataTrigger>
+                                <MultiDataTrigger.Conditions>
+                                    <Condition Binding="{Binding IsMouseOver, ElementName=Item}" Value="True" />
+                                    <Condition Binding="{Binding ZoomOnHover, ElementName=Root}" Value="True" />
+                                </MultiDataTrigger.Conditions>
+                                <MultiDataTrigger.EnterActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetName="Zoom" Storyboard.TargetProperty="ScaleX" To="1.12" Duration="0:0:0.12" />
+                                            <DoubleAnimation Storyboard.TargetName="Zoom" Storyboard.TargetProperty="ScaleY" To="1.12" Duration="0:0:0.12" />
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </MultiDataTrigger.EnterActions>
+                                <MultiDataTrigger.ExitActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetName="Zoom" Storyboard.TargetProperty="ScaleX" To="1" Duration="0:0:0.15" />
+                                            <DoubleAnimation Storyboard.TargetName="Zoom" Storyboard.TargetProperty="ScaleY" To="1" Duration="0:0:0.15" />
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </MultiDataTrigger.ExitActions>
+                            </MultiDataTrigger>
+                            <DataTrigger Binding="{Binding IsLaunching}" Value="True">
+                                <DataTrigger.EnterActions>
+                                    <BeginStoryboard x:Name="Pulse">
+                                        <Storyboard RepeatBehavior="Forever" AutoReverse="True">
+                                            <DoubleAnimation Storyboard.TargetName="Icon" Storyboard.TargetProperty="Opacity" From="1" To="0.35" Duration="0:0:0.45" />
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </DataTrigger.EnterActions>
+                                <DataTrigger.ExitActions>
+                                    <StopStoryboard BeginStoryboardName="Pulse" />
+                                </DataTrigger.ExitActions>
+                            </DataTrigger>
+                        </DataTemplate.Triggers>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </DockPanel>
+    </Border>
+</UserControl>

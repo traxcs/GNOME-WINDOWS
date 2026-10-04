@@ -1,0 +1,964 @@
+using System.Diagnostics;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
+using System.Windows.Data;
+using System.Windows.Input;
+using System.Windows.Interop;
+using System.Windows.Media;
+using System.Windows.Shell;
+using GnomeWin.Core;
+using GnomeWin.Input.GlobalHotkeys;
+using GnomeWin.Platform.Win32;
+using GnomeWin.Services;
+using GnomeWin.Services.Settings;
+using GnomeWin.Services.SystemStatus;
+using GnomeWin.UI;
+using GnomeWin.UI.Themes;
+using Microsoft.Win32;
+using WpfRectangle = System.Windows.Shapes.Rectangle;
+using WpfEllipse = System.Windows.Shapes.Ellipse;
+
+namespace GnomeWin.Shell.Settings;
+
+/// <summary>
+/// Settings application reproducing GNOME Settings (GNOME 47, libadwaita): integrated header bar,
+/// searchable sidebar with the same panels, boxed-list preference groups. Shell options live in
+/// the matching GNOME panel; system matters that Windows already handles open Windows Settings.
+/// Changes apply immediately.
+/// </summary>
+public sealed class SettingsWindow : Window
+{
+    private sealed record PanelDef(string Id, string Fr, string En, string Glyph, string Keywords, Func<UIElement> Build);
+
+    private readonly SettingsService _settings;
+    private readonly KeyboardHookService? _hook;
+    private readonly SystemStatusService? _status;
+    private readonly ApplicationManager? _apps;
+    private readonly Func<string> _diagnostics;
+    private readonly Action _restoreAndQuit;
+    private readonly List<PanelDef> _panels;
+    private readonly ListBox _sidebar = new();
+    private readonly TextBox _search = new();
+    private readonly Border _searchHost = new();
+    private readonly TextBlock _pageTitle = new();
+    private readonly ScrollViewer _content = new();
+
+    public SettingsWindow(SettingsService settings, KeyboardHookService? hook, SystemStatusService? status, ApplicationManager? apps,
+                          Func<string> diagnostics, Action restoreAndQuit)
+    {
+        _settings = settings;
+        _hook = hook;
+        _status = status;
+        _apps = apps;
+        _diagnostics = diagnostics;
+        _restoreAndQuit = restoreAndQuit;
+
+        Title = L("Paramètres", "Settings");
+        Width = 1020;
+        Height = 720;
+        MinWidth = 760;
+        MinHeight = 520;
+        WindowStartupLocation = WindowStartupLocation.CenterScreen;
+        SetResourceReference(BackgroundProperty, "Brush.WindowBg");
+        SetResourceReference(ForegroundProperty, "Brush.Fg");
+        SetResourceReference(FontFamilyProperty, "Font.Ui");
+        FontSize = 14;
+        TextOptions.SetTextFormattingMode(this, TextFormattingMode.Display);
+        Icon = System.Windows.Media.Imaging.BitmapFrame.Create(new Uri("pack://application:,,,/GnomeWin;component/Assets/GnomeWin.ico"));
+        // Client-side decorations like libadwaita: the header bar is part of the content.
+        WindowChrome.SetWindowChrome(this, new WindowChrome
+        {
+            CaptionHeight = 46,
+            ResizeBorderThickness = new Thickness(6),
+            GlassFrameThickness = new Thickness(0),
+            UseAeroCaptionButtons = false,
+            CornerRadius = new CornerRadius(12),
+        });
+
+        _panels = new List<PanelDef>
+        {
+            new("wifi", "Wi-Fi", "Wi-Fi", "", "wifi wlan sans fil wireless", BuildWifi),
+            new("network", "Réseau", "Network", "", "reseau network ethernet vpn proxy", BuildNetwork),
+            new("bluetooth", "Bluetooth", "Bluetooth", "", "bluetooth", BuildBluetooth),
+            new("displays", "Écrans", "Displays", "", "ecrans displays moniteur monitor resolution plein ecran fullscreen barre", BuildDisplays),
+            new("sound", "Son", "Sound", "", "son sound volume audio", BuildSound),
+            new("power", "Énergie", "Power", "", "energie power batterie battery", BuildPower),
+            new("multitasking", "Multitâche", "Multitasking", "", "multitache multitasking espaces workspaces coin actif hot corner", BuildMultitasking),
+            new("appearance", "Apparence", "Appearance", "", "apparence appearance theme style accent couleur sombre dark fond", BuildAppearance),
+            new("dock", "Dock", "Dock", "", "dock dash barre favoris", BuildDock),
+            new("apps", "Applications", "Apps", "", "applications apps defaut demarrage favoris", BuildApps),
+            new("notifications", "Notifications", "Notifications", "", "notifications ne pas deranger", BuildNotifications),
+            new("search", "Recherche", "Search", "", "recherche search fichiers calculatrice", BuildSearch),
+            new("mouse", "Souris et pavé tactile", "Mouse & Touchpad", "", "souris mouse touchpad pave", BuildMouse),
+            new("keyboard", "Clavier", "Keyboard", "", "clavier keyboard raccourcis shortcuts super", BuildKeyboard),
+            new("printers", "Imprimantes", "Printers", "", "imprimantes printers", BuildPrinters),
+            new("accessibility", "Accessibilité", "Accessibility", "", "accessibilite accessibility animations", BuildAccessibility),
+            new("privacy", "Confidentialité et sécurité", "Privacy & Security", "", "confidentialite privacy securite", BuildPrivacy),
+            new("system", "Système", "System", "", "systeme system a propos about langue date demarrage maintenance journaux", BuildSystem),
+        };
+
+        Content = BuildLayout();
+        RefreshSidebar(string.Empty);
+        ShowPanel("appearance");
+
+        SourceInitialized += (_, _) => { UI.Components.ShellWindow.UseSoftwareRendering(this); ApplyTitleBarTheme(); };
+        ThemeManager.ThemeChanged += ApplyTitleBarTheme;
+        Closed += (_, _) => { ThemeManager.ThemeChanged -= ApplyTitleBarTheme; _hook?.CancelCapture(); };
+        PreviewKeyDown += (_, e) =>
+        {
+            if (e.Key == Key.F && Keyboard.Modifiers == ModifierKeys.Control) { ToggleSearch(true); e.Handled = true; }
+            else if (e.Key == Key.Escape && _searchHost.Visibility == Visibility.Visible) { ToggleSearch(false); e.Handled = true; }
+        };
+    }
+
+    public void ShowPanel(string id)
+    {
+        if (_panels.All(p => p.Id != id)) return;
+        if (_search.Text.Length > 0) ToggleSearch(false);
+        _sidebar.SelectedItem = _sidebar.Items.Cast<ListBoxItem>().FirstOrDefault(x => (string)x.Tag == id);
+    }
+
+    private void ApplyTitleBarTheme()
+    {
+        var h = new WindowInteropHelper(this).Handle;
+        if (h == IntPtr.Zero) return;
+        int dark = ThemeManager.IsDark ? 1 : 0;
+        NativeMethods.DwmSetWindowAttribute(h, NativeMethods.DWMWA_USE_IMMERSIVE_DARK_MODE, ref dark, sizeof(int));
+        int round = NativeMethods.DWMWCP_ROUND;
+        NativeMethods.DwmSetWindowAttribute(h, NativeMethods.DWMWA_WINDOW_CORNER_PREFERENCE, ref round, sizeof(int));
+    }
+
+    // ================================================================== layout
+    private UIElement BuildLayout()
+    {
+        var root = new Grid();
+        root.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(270) });
+        root.ColumnDefinitions.Add(new ColumnDefinition());
+
+        // ---- sidebar
+        var side = new DockPanel();
+        side.SetResourceReference(System.Windows.Controls.Panel.BackgroundProperty, "Brush.SidebarBg");
+        var sideHeader = new Grid { Height = 46 };
+        var searchBtn = HeaderButton("", L("Rechercher", "Search"), () => ToggleSearch(_searchHost.Visibility != Visibility.Visible));
+        searchBtn.HorizontalAlignment = HorizontalAlignment.Left;
+        searchBtn.Margin = new Thickness(8, 0, 0, 0);
+        var menuBtn = HeaderButton("", L("Menu principal", "Main menu"), () => { });
+        menuBtn.HorizontalAlignment = HorizontalAlignment.Right;
+        menuBtn.Margin = new Thickness(0, 0, 8, 0);
+        menuBtn.Click += (_, _) => ShowMainMenu(menuBtn);
+        sideHeader.Children.Add(searchBtn);
+        sideHeader.Children.Add(new TextBlock { Text = L("Paramètres", "Settings"), FontWeight = FontWeights.Bold, FontSize = 15, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, IsHitTestVisible = false });
+        sideHeader.Children.Add(menuBtn);
+        DockPanel.SetDock(sideHeader, System.Windows.Controls.Dock.Top);
+        side.Children.Add(sideHeader);
+
+        _search.SetResourceReference(StyleProperty, "InputBox");
+        _search.Padding = new Thickness(8, 6, 8, 6);
+        _search.TextChanged += (_, _) => RefreshSidebar(_search.Text);
+        _searchHost.Child = _search;
+        _searchHost.Padding = new Thickness(10, 0, 10, 8);
+        _searchHost.Visibility = Visibility.Collapsed;
+        DockPanel.SetDock(_searchHost, System.Windows.Controls.Dock.Top);
+        side.Children.Add(_searchHost);
+
+        _sidebar.BorderThickness = new Thickness(0);
+        _sidebar.Background = Brushes.Transparent;
+        _sidebar.Padding = new Thickness(6, 0, 6, 6);
+        _sidebar.ItemContainerStyle = SidebarItemStyle();
+        ScrollViewer.SetHorizontalScrollBarVisibility(_sidebar, ScrollBarVisibility.Disabled);
+        _sidebar.SelectionChanged += (_, _) => { if (_sidebar.SelectedItem is ListBoxItem it) ShowPanelContent((string)it.Tag); };
+        side.Children.Add(_sidebar);
+        WindowChrome.SetIsHitTestVisibleInChrome(searchBtn, true);
+        WindowChrome.SetIsHitTestVisibleInChrome(menuBtn, true);
+        root.Children.Add(side);
+
+        // ---- content
+        var main = new DockPanel();
+        Grid.SetColumn(main, 1);
+        var header = new Grid { Height = 46 };
+        _pageTitle.FontWeight = FontWeights.Bold;
+        _pageTitle.FontSize = 15;
+        _pageTitle.HorizontalAlignment = HorizontalAlignment.Center;
+        _pageTitle.VerticalAlignment = VerticalAlignment.Center;
+        _pageTitle.IsHitTestVisible = false;
+        header.Children.Add(_pageTitle);
+        var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 0, 10, 0) };
+        buttons.Children.Add(WindowButton("", () => WindowState = WindowState.Minimized));
+        buttons.Children.Add(WindowButton("", () => WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized));
+        buttons.Children.Add(WindowButton("", Close));
+        header.Children.Add(buttons);
+        DockPanel.SetDock(header, System.Windows.Controls.Dock.Top);
+        main.Children.Add(header);
+        _content.VerticalScrollBarVisibility = ScrollBarVisibility.Auto;
+        _content.HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled;
+        _content.Focusable = false;
+        main.Children.Add(_content);
+        root.Children.Add(main);
+        return root;
+    }
+
+    private void ToggleSearch(bool show)
+    {
+        _searchHost.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+        if (show) { _search.Focus(); Keyboard.Focus(_search); }
+        else _search.Text = string.Empty;
+    }
+
+    private void RefreshSidebar(string filter)
+    {
+        string q = Services.Search.TextMatcher.Normalize(filter);
+        string? selected = (_sidebar.SelectedItem as ListBoxItem)?.Tag as string;
+        _sidebar.Items.Clear();
+        foreach (var p in _panels)
+        {
+            string hay = Services.Search.TextMatcher.Normalize(p.Fr + " " + p.En + " " + p.Keywords);
+            if (q.Length > 0 && !hay.Contains(q)) continue;
+            var row = new StackPanel { Orientation = Orientation.Horizontal };
+            var glyph = new TextBlock { Text = p.Glyph, FontSize = 16, Width = 22, Margin = new Thickness(0, 0, 12, 0), VerticalAlignment = VerticalAlignment.Center, TextAlignment = TextAlignment.Center };
+            glyph.SetResourceReference(TextBlock.FontFamilyProperty, "Font.Icons");
+            row.Children.Add(glyph);
+            row.Children.Add(new TextBlock { Text = Loc.IsFrench ? p.Fr : p.En, VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis });
+            var item = new ListBoxItem { Content = row, Tag = p.Id };
+            _sidebar.Items.Add(item);
+            if (p.Id == selected) _sidebar.SelectedItem = item;
+        }
+        if (_sidebar.SelectedItem == null && _sidebar.Items.Count > 0 && q.Length > 0) _sidebar.SelectedIndex = 0;
+    }
+
+    private void ShowPanelContent(string id)
+    {
+        var p = _panels.First(x => x.Id == id);
+        _pageTitle.Text = Loc.IsFrench ? p.Fr : p.En;
+        // libadwaita "clamp": content centred, at most ~640 px wide.
+        var clamp = new StackPanel { MaxWidth = 640, Margin = new Thickness(24, 12, 24, 36) };
+        clamp.Children.Add(p.Build());
+        _content.Content = clamp;
+        _content.ScrollToTop();
+    }
+
+    private void ShowMainMenu(FrameworkElement anchor)
+    {
+        var menu = new ContextMenu { PlacementTarget = anchor, Placement = PlacementMode.Bottom };
+        void Add(string text, Action a) { var mi = new MenuItem { Header = text }; mi.Click += (_, _) => a(); menu.Items.Add(mi); }
+        Add(L("Raccourcis clavier", "Keyboard Shortcuts"), () => ShowPanel("keyboard"));
+        Add(L("À propos de GnomeWin", "About GnomeWin"), () => ShowPanel("system"));
+        menu.IsOpen = true;
+    }
+
+    private static Style SidebarItemStyle()
+    {
+        var style = new Style(typeof(ListBoxItem));
+        var template = new ControlTemplate(typeof(ListBoxItem));
+        var bd = new FrameworkElementFactory(typeof(Border), "Bd");
+        bd.SetValue(Border.CornerRadiusProperty, new CornerRadius(6));
+        bd.SetValue(Border.PaddingProperty, new Thickness(10, 9, 10, 9));
+        bd.SetValue(Border.BackgroundProperty, Brushes.Transparent);
+        bd.SetValue(Border.MarginProperty, new Thickness(0, 1, 0, 1));
+        bd.AppendChild(new FrameworkElementFactory(typeof(ContentPresenter)));
+        template.VisualTree = bd;
+        var hover = new Trigger { Property = UIElement.IsMouseOverProperty, Value = true };
+        hover.Setters.Add(new Setter(Border.BackgroundProperty, new DynamicResourceExtension("Brush.ItemHover"), "Bd"));
+        var selected = new Trigger { Property = ListBoxItem.IsSelectedProperty, Value = true };
+        selected.Setters.Add(new Setter(Border.BackgroundProperty, new DynamicResourceExtension("Brush.ItemSelected"), "Bd"));
+        template.Triggers.Add(hover);
+        template.Triggers.Add(selected);
+        style.Setters.Add(new Setter(Control.TemplateProperty, template));
+        style.Setters.Add(new Setter(Control.ForegroundProperty, new DynamicResourceExtension("Brush.Fg")));
+        style.Setters.Add(new Setter(FrameworkElement.FocusVisualStyleProperty, null));
+        return style;
+    }
+
+    private Button HeaderButton(string glyph, string tip, Action click)
+    {
+        var b = new Button { Content = glyph, ToolTip = tip, Width = 34, Height = 34, FontSize = 14, VerticalAlignment = VerticalAlignment.Center };
+        b.SetResourceReference(StyleProperty, "ShellButton");
+        b.SetResourceReference(FontFamilyProperty, "Font.Icons");
+        b.Padding = new Thickness(0);
+        b.Click += (_, _) => click();
+        return b;
+    }
+
+    private Button WindowButton(string glyph, Action click)
+    {
+        // libadwaita window controls: small round grey buttons.
+        var b = new Button { Content = glyph, Width = 24, Height = 24, FontSize = 8, Margin = new Thickness(8, 0, 0, 0) };
+        b.SetResourceReference(StyleProperty, "RoundIconButton");
+        b.Click += (_, _) => click();
+        WindowChrome.SetIsHitTestVisibleInChrome(b, true);
+        return b;
+    }
+
+    // ================================================================== row builders (AdwPreferencesGroup / rows)
+    private static string L(string fr, string en) => Loc.IsFrench ? fr : en;
+
+    private static UIElement Group(string? title, string? description, params UIElement[] rows)
+    {
+        var panel = new StackPanel { Margin = new Thickness(0, 12, 0, 12) };
+        if (title != null)
+            panel.Children.Add(new TextBlock { Text = title, FontWeight = FontWeights.Bold, FontSize = 14, Margin = new Thickness(0, 0, 0, description == null ? 10 : 2) });
+        if (description != null)
+        {
+            var d = new TextBlock { Text = description, TextWrapping = TextWrapping.Wrap, FontSize = 13, Margin = new Thickness(0, 0, 0, 10) };
+            d.SetResourceReference(TextBlock.ForegroundProperty, "Brush.FgDim");
+            panel.Children.Add(d);
+        }
+        if (rows.Length > 0)
+        {
+            var list = new StackPanel();
+            for (int i = 0; i < rows.Length; i++)
+            {
+                if (i > 0)
+                {
+                    var sep = new Border { Height = 1 };
+                    sep.SetResourceReference(Border.BackgroundProperty, "Brush.Separator");
+                    list.Children.Add(sep);
+                }
+                list.Children.Add(rows[i]);
+            }
+            var card = new Border { CornerRadius = new CornerRadius(12), Child = list, ClipToBounds = true };
+            card.SetResourceReference(Border.BackgroundProperty, "Brush.CardBg");
+            panel.Children.Add(card);
+        }
+        return panel;
+    }
+
+    /// <summary>A preferences group whose content is free (style thumbnails).</summary>
+    private static UIElement GroupBox(string title, UIElement content)
+    {
+        var card = new Border { CornerRadius = new CornerRadius(12), Child = content };
+        card.SetResourceReference(Border.BackgroundProperty, "Brush.CardBg");
+        var p = new StackPanel { Margin = new Thickness(0, 12, 0, 12) };
+        p.Children.Add(new TextBlock { Text = title, FontWeight = FontWeights.Bold, FontSize = 14, Margin = new Thickness(0, 0, 0, 10) });
+        p.Children.Add(card);
+        return p;
+    }
+
+    private static Grid RowShell(string title, string? subtitle, UIElement? suffix, UIElement? prefix = null)
+    {
+        var g = new Grid { MinHeight = 52 };
+        g.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        g.ColumnDefinitions.Add(new ColumnDefinition());
+        g.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        if (prefix is FrameworkElement pf)
+        {
+            pf.Margin = new Thickness(14, 0, 0, 0);
+            pf.VerticalAlignment = VerticalAlignment.Center;
+            g.Children.Add(pf);
+        }
+        var texts = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(prefix == null ? 14 : 12, 8, 12, 8) };
+        texts.Children.Add(new TextBlock { Text = title, TextWrapping = TextWrapping.Wrap });
+        if (!string.IsNullOrEmpty(subtitle))
+        {
+            var s = new TextBlock { Text = subtitle, FontSize = 12.5, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 2, 0, 0) };
+            s.SetResourceReference(TextBlock.ForegroundProperty, "Brush.FgDim");
+            texts.Children.Add(s);
+        }
+        Grid.SetColumn(texts, 1);
+        g.Children.Add(texts);
+        if (suffix is FrameworkElement fe)
+        {
+            fe.VerticalAlignment = VerticalAlignment.Center;
+            fe.Margin = new Thickness(0, 0, 14, 0);
+            Grid.SetColumn(fe, 2);
+            g.Children.Add(fe);
+        }
+        return g;
+    }
+
+    private static void MakeActivatable(Grid row, Action click)
+    {
+        row.Background = Brushes.Transparent;
+        row.Cursor = Cursors.Hand;
+        row.MouseEnter += (_, _) => row.SetResourceReference(System.Windows.Controls.Panel.BackgroundProperty, "Brush.ItemHover");
+        row.MouseLeave += (_, _) => row.Background = Brushes.Transparent;
+        row.MouseLeftButtonUp += (_, _) => click();
+    }
+
+    private static bool IsWithin(object source, DependencyObject container)
+    {
+        var d = source as DependencyObject;
+        while (d != null) { if (ReferenceEquals(d, container)) return true; d = VisualTreeHelper.GetParent(d); }
+        return false;
+    }
+
+    /// <summary>AdwSwitchRow: the whole row toggles the switch.</summary>
+    private static UIElement SwitchRow(string title, string? subtitle, object source, string path)
+    {
+        var sw = new CheckBox();
+        sw.SetResourceReference(StyleProperty, "Switch");
+        sw.SetBinding(ToggleButton.IsCheckedProperty, new Binding(path) { Source = source, Mode = BindingMode.TwoWay });
+        var row = RowShell(title, subtitle, sw);
+        row.Background = Brushes.Transparent;
+        row.Cursor = Cursors.Hand;
+        row.MouseLeftButtonUp += (_, e) => { if (!IsWithin(e.OriginalSource, sw)) sw.IsChecked = sw.IsChecked != true; };
+        return row;
+    }
+
+    private static UIElement SwitchRowAction(string title, string? subtitle, bool value, Action<bool> changed)
+    {
+        var sw = new CheckBox { IsChecked = value };
+        sw.SetResourceReference(StyleProperty, "Switch");
+        sw.Click += (_, _) => changed(sw.IsChecked == true);
+        var row = RowShell(title, subtitle, sw);
+        row.Background = Brushes.Transparent;
+        row.Cursor = Cursors.Hand;
+        row.MouseLeftButtonUp += (_, e) => { if (!IsWithin(e.OriginalSource, sw)) { sw.IsChecked = sw.IsChecked != true; changed(sw.IsChecked == true); } };
+        return row;
+    }
+
+    /// <summary>AdwComboRow.</summary>
+    private static UIElement ComboRow<T>(string title, string? subtitle, object source, string path, params (T Value, string Fr, string En)[] options) where T : struct, Enum
+    {
+        var c = new ComboBox { MinWidth = 170 };
+        foreach (var o in options) c.Items.Add(new ComboBoxItem { Content = Loc.IsFrench ? o.Fr : o.En, Tag = o.Value });
+        var prop = source.GetType().GetProperty(path)!;
+        T current = (T)prop.GetValue(source)!;
+        c.SelectedIndex = Math.Max(0, Array.FindIndex(options, o => EqualityComparer<T>.Default.Equals(o.Value, current)));
+        c.SelectionChanged += (_, _) => { if (c.SelectedItem is ComboBoxItem it) prop.SetValue(source, it.Tag); };
+        return RowShell(title, subtitle, c);
+    }
+
+    private static UIElement SliderRow(string title, string? subtitle, object source, string path, double min, double max, double tick, Func<double, string> format)
+    {
+        var panel = new StackPanel { Orientation = Orientation.Horizontal };
+        var s = new Slider { Minimum = min, Maximum = max, Width = 200, TickFrequency = tick, IsSnapToTickEnabled = true };
+        s.SetResourceReference(StyleProperty, "ShellSlider");
+        s.SetBinding(RangeBase.ValueProperty, new Binding(path) { Source = source, Mode = BindingMode.TwoWay });
+        var label = new TextBlock { Width = 52, TextAlignment = TextAlignment.Right, VerticalAlignment = VerticalAlignment.Center, Text = format(s.Value) };
+        label.SetResourceReference(TextBlock.ForegroundProperty, "Brush.FgDim");
+        s.ValueChanged += (_, e) => label.Text = format(e.NewValue);
+        panel.Children.Add(s);
+        panel.Children.Add(label);
+        return RowShell(title, subtitle, panel);
+    }
+
+    /// <summary>Navigation / external row with a trailing arrow.</summary>
+    private static UIElement LinkRow(string title, string? subtitle, Action click, bool external = true)
+    {
+        var arrow = new TextBlock { Text = external ? "" : "", FontSize = 12 };
+        arrow.SetResourceReference(TextBlock.FontFamilyProperty, "Font.Icons");
+        arrow.SetResourceReference(TextBlock.ForegroundProperty, "Brush.FgDim");
+        var row = RowShell(title, subtitle, arrow);
+        MakeActivatable(row, click);
+        return row;
+    }
+
+    private static UIElement WinLink(string title, string uri, string? subtitle = null) =>
+        LinkRow(title, subtitle ?? L("Ouvre les Paramètres Windows", "Opens Windows Settings"), () => ShellLauncher.Open(uri));
+
+    private static UIElement InfoRow(string title, string value)
+    {
+        var v = new TextBlock { Text = value, TextWrapping = TextWrapping.Wrap, MaxWidth = 340, TextAlignment = TextAlignment.Right };
+        v.SetResourceReference(TextBlock.ForegroundProperty, "Brush.FgDim");
+        return RowShell(title, null, v);
+    }
+
+    private static UIElement ButtonRow(string title, string? subtitle, string button, Action click, bool destructive = false)
+    {
+        var b = new Button { Content = button };
+        b.SetResourceReference(StyleProperty, destructive ? "AccentButton" : "FlatButton");
+        if (destructive) b.SetResourceReference(BackgroundProperty, "Brush.Danger");
+        b.Click += (_, _) => click();
+        return RowShell(title, subtitle, b);
+    }
+
+    private static UIElement Note(string text)
+    {
+        var t = new TextBlock { Text = text, TextWrapping = TextWrapping.Wrap, FontSize = 12.5, Margin = new Thickness(2, 0, 2, 12) };
+        t.SetResourceReference(TextBlock.ForegroundProperty, "Brush.FgDim");
+        return t;
+    }
+
+    private static StackPanel Page(params UIElement[] children)
+    {
+        var p = new StackPanel();
+        foreach (var c in children) p.Children.Add(c);
+        return p;
+    }
+
+    /// <summary>Row with a radio button prefix (AdwActionRow + GtkCheckButton in a group).</summary>
+    private static UIElement RadioRow(string group, string title, string? subtitle, bool isChecked, Action selected)
+    {
+        var rb = new RadioButton { IsChecked = isChecked, GroupName = group, Focusable = false };
+        rb.Checked += (_, _) => selected();
+        var row = RowShell(title, subtitle, null, rb);
+        row.Background = Brushes.Transparent;
+        row.Cursor = Cursors.Hand;
+        row.MouseLeftButtonUp += (_, _) => rb.IsChecked = true;
+        return row;
+    }
+
+    // ================================================================== panels
+    private UIElement BuildWifi()
+    {
+        _status?.EnsureDetails();
+        var s = _status;
+        string current = s == null ? "-" : s.Network == NetworkKind.Wifi ? (string.IsNullOrEmpty(s.Ssid) ? L("Connecté", "Connected") : s.Ssid!) : L("Non connecté en Wi-Fi", "Not connected to Wi-Fi");
+        var rows = new List<UIElement>();
+        if (s?.WifiOn is bool on) rows.Add(SwitchRowAction("Wi-Fi", null, on, v => _ = s.SetRadioAsync(true, v)));
+        rows.Add(InfoRow(L("Réseau actuel", "Current network"), current));
+        return Page(
+            Group(null, null, rows.ToArray()),
+            Group(L("Réseaux visibles", "Visible Networks"), null,
+                WinLink(L("Se connecter à un réseau", "Connect to a network"), "ms-settings:network-wifi"),
+                WinLink(L("Gérer les réseaux connus", "Manage known networks"), "ms-settings:network-wifisettings"),
+                WinLink(L("Point d'accès mobile", "Mobile hotspot"), "ms-settings:network-mobilehotspot")));
+    }
+
+    private UIElement BuildNetwork()
+    {
+        var s = _status;
+        string kind = s == null ? "-" : s.Network switch
+        {
+            NetworkKind.Wifi => "Wi-Fi",
+            NetworkKind.Ethernet => L("Filaire, connecté", "Wired, connected"),
+            NetworkKind.Other => L("Connecté", "Connected"),
+            _ => L("Déconnecté", "Disconnected"),
+        };
+        return Page(
+            Group(L("Filaire", "Wired"), null, InfoRow(L("État", "Status"), kind), WinLink("Ethernet", "ms-settings:network-ethernet")),
+            Group("VPN", null, WinLink(L("Ajouter une connexion VPN", "Add VPN connection"), "ms-settings:network-vpn")),
+            Group(L("Mandataire réseau", "Network Proxy"), null, WinLink(L("Mandataire", "Proxy"), "ms-settings:network-proxy")),
+            Group(L("Avancé", "Advanced"), null, WinLink(L("Paramètres réseau avancés", "Advanced network settings"), "ms-settings:network-advancedsettings")));
+    }
+
+    private UIElement BuildBluetooth()
+    {
+        _status?.EnsureDetails();
+        var rows = new List<UIElement>();
+        if (_status?.BluetoothOn is bool on) rows.Add(SwitchRowAction("Bluetooth", null, on, v => _ = _status.SetRadioAsync(false, v)));
+        rows.Add(WinLink(L("Appareils", "Devices"), "ms-settings:bluetooth", L("Associer et gérer les appareils", "Pair and manage devices")));
+        return Page(Group(null, null, rows.ToArray()));
+    }
+
+    private UIElement BuildDisplays()
+    {
+        var d = _settings.Current.Displays;
+        var g = _settings.Current.General;
+        return Page(
+            Group(L("Écrans", "Displays"), null,
+                WinLink(L("Résolution, échelle et orientation", "Resolution, scale and orientation"), "ms-settings:display"),
+                WinLink(L("Éclairage nocturne", "Night Light"), "ms-settings:nightlight"),
+                WinLink(L("Plusieurs écrans", "Multiple displays"), "ms-settings:display-advanced")),
+            Group(L("Bureau", "Desktop"), null,
+                SwitchRow(L("Barre supérieure", "Top bar"), null, g, nameof(g.ShowTopBar)),
+                ComboRow(L("Barre supérieure sur", "Top bar on"), null, d, nameof(d.TopBarMonitors), (MonitorPlacement.All, "Tous les écrans", "All displays"), (MonitorPlacement.Primary, "Écran principal", "Primary display")),
+                ComboRow(L("Vue d'ensemble sur", "Overview on"), null, d, nameof(d.OverviewMonitors), (MonitorPlacement.All, "Tous les écrans", "All displays"), (MonitorPlacement.Primary, "Écran principal", "Primary display")),
+                ComboRow(L("Dock sur", "Dock on"), null, d, nameof(d.DockMonitors), (MonitorPlacement.Primary, "Écran principal", "Primary display"), (MonitorPlacement.All, "Tous les écrans", "All displays"), (MonitorPlacement.Active, "Écran actif", "Active display"))),
+            Group(L("Applications en plein écran", "Fullscreen applications"), L("Jeux, vidéos et présentations.", "Games, videos and presentations."),
+                SwitchRow(L("Masquer le dock", "Hide the dock"), null, d, nameof(d.HideDockInFullscreen)),
+                SwitchRow(L("Masquer la barre supérieure", "Hide the top bar"), null, d, nameof(d.HideTopBarInFullscreen)),
+                SwitchRow(L("Désactiver les raccourcis", "Disable shortcuts"), L("La touche Super retrouve son comportement Windows.", "The Super key keeps its Windows behaviour."), d, nameof(d.DisableShortcutsInFullscreen))));
+    }
+
+    private UIElement BuildSound()
+    {
+        var rows = new List<UIElement>();
+        if (_status is { AudioAvailable: true } s)
+        {
+            var slider = new Slider { Minimum = 0, Maximum = 100, Width = 240, Value = Math.Round(s.Volume * 100) };
+            slider.SetResourceReference(StyleProperty, "ShellSlider");
+            slider.ValueChanged += (_, e) => s.Volume = (float)(e.NewValue / 100);
+            rows.Add(RowShell(L("Volume du système", "System Volume"), null, slider));
+            rows.Add(SwitchRowAction(L("Couper le son", "Mute"), null, s.Muted, v => s.Muted = v));
+        }
+        rows.Add(WinLink(L("Périphérique de sortie", "Output device"), "ms-settings:sound"));
+        return Page(
+            Group(L("Sortie", "Output"), null, rows.ToArray()),
+            Group(L("Entrée", "Input"), null, WinLink(L("Périphérique d'entrée", "Input device"), "ms-settings:sound")),
+            Group(L("Sons", "Sounds"), null, WinLink(L("Mélangeur de volume", "Volume mixer"), "ms-settings:apps-volume")));
+    }
+
+    private UIElement BuildPower()
+    {
+        var s = _status;
+        var rows = new List<UIElement>();
+        if (s is { HasBattery: true })
+            rows.Add(InfoRow(L("Batterie", "Battery"), $"{s.BatteryPercent} %" + (s.Charging ? " — " + L("en charge", "charging") : string.Empty)));
+        rows.Add(WinLink(L("Mode d'alimentation", "Power Mode"), "ms-settings:powersleep"));
+        return Page(
+            Group(L("Alimentation", "Power"), null, rows.ToArray()),
+            Group(L("Économie d'énergie", "Power Saving"), null,
+                WinLink(L("Économiseur de batterie", "Battery saver"), "ms-settings:batterysaver"),
+                WinLink(L("Écran et mise en veille", "Screen and sleep"), "ms-settings:powersleep")));
+    }
+
+    private UIElement BuildMultitasking()
+    {
+        var o = _settings.Current.Overview;
+        var w = _settings.Current.Workspaces;
+        return Page(
+            Group(L("Général", "General"), null,
+                SwitchRow(L("Coin actif", "Hot Corner"), L("Toucher le coin supérieur gauche pour ouvrir la vue d'ensemble des activités.", "Touch the top-left corner to open the Activities Overview."), o, nameof(o.HotCorner))),
+            Group(L("Espaces de travail", "Workspaces"), null,
+                RadioRow("ws", L("Espaces de travail dynamiques", "Dynamic workspaces"), L("Les espaces vides sont supprimés automatiquement.", "Automatically removes empty workspaces."), w.Dynamic, () => w.Dynamic = true),
+                RadioRow("ws", L("Nombre fixe d'espaces de travail", "Fixed number of workspaces"), L("Indiquez le nombre d'espaces de travail.", "Specify a number of permanent workspaces."), !w.Dynamic, () => w.Dynamic = false),
+                SliderRow(L("Nombre d'espaces de travail", "Number of Workspaces"), null, w, nameof(w.InitialCount), 1, 16, 1, v => $"{v:0}"),
+                SwitchRow(L("Indicateur lors du changement", "Show switch indicator"), null, w, nameof(w.ShowSwitchOsd)),
+                SwitchRow(L("Boucler à la fin", "Wrap around"), null, w, nameof(w.WrapAround))),
+            Group(L("Changement d'application", "App Switching"), null,
+                RadioRow("switch", L("Inclure les applications de tous les espaces de travail", "Include apps from all workspaces"), null, !w.SwitcherCurrentWorkspaceOnly, () => w.SwitcherCurrentWorkspaceOnly = false),
+                RadioRow("switch", L("Inclure uniquement les applications de l'espace de travail actuel", "Include apps from the current workspace only"), null, w.SwitcherCurrentWorkspaceOnly, () => w.SwitcherCurrentWorkspaceOnly = true)),
+            Note(L("Les espaces de travail sont les bureaux virtuels de Windows : la Vue des tâches et Ctrl+Win+Flèches restent cohérents.",
+                   "Workspaces are Windows virtual desktops: Task View and Ctrl+Win+Arrows stay consistent.")));
+    }
+
+    // ---------------------------------------------------------------- Appearance (GNOME 47 layout)
+    private UIElement BuildAppearance()
+    {
+        var g = _settings.Current.General;
+        var o = _settings.Current.Overview;
+
+        var styles = new WrapPanel { HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(8, 14, 8, 6) };
+        foreach (var (st, name) in new[] { (DesignStyle.Gnome, "GNOME"), (DesignStyle.Ubuntu, "Ubuntu"), (DesignStyle.PopOS, "Pop!_OS") })
+            styles.Children.Add(StyleCard(st, name, g.Style == st, () =>
+            {
+                g.Style = st;
+                StylePresets.ApplyLayout(st, _settings.Current);
+                ShowPanelContent("appearance");
+            }));
+
+        var modes = new WrapPanel { HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(8, 14, 8, 6) };
+        foreach (var (m, fr, en) in new[] { (ThemeMode.Light, "Défaut", "Default"), (ThemeMode.Dark, "Sombre", "Dark"), (ThemeMode.System, "Comme Windows", "Follow Windows") })
+            modes.Children.Add(ModeCard(m, L(fr, en), g.Theme == m, () => { g.Theme = m; ShowPanelContent("appearance"); }));
+
+        var accents = new WrapPanel { HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(12, 4, 12, 16) };
+        var list = g.Style == DesignStyle.Ubuntu
+            ? new[] { AccentColor.Default, AccentColor.Bark, AccentColor.Sage, AccentColor.Olive, AccentColor.Viridian, AccentColor.PrussianGreen, AccentColor.Blue, AccentColor.Purple, AccentColor.Magenta, AccentColor.Red }
+            : new[] { AccentColor.Default, AccentColor.Teal, AccentColor.Green, AccentColor.Yellow, AccentColor.Orange, AccentColor.Red, AccentColor.Pink, AccentColor.Purple, AccentColor.Slate };
+        foreach (var a in list)
+            accents.Children.Add(AccentDot(a, g.Accent == a, () => { g.Accent = a; ShowPanelContent("appearance"); }));
+
+        var styleCard = new StackPanel();
+        styleCard.Children.Add(modes);
+        styleCard.Children.Add(accents);
+
+        return Page(
+            GroupBox(L("Style du bureau", "Desktop Style"), styles),
+            GroupBox(L("Style", "Style"), styleCard),
+            Group(L("Arrière-plan", "Background"), null,
+                WinLink(L("Fond d'écran", "Wallpaper"), "ms-settings:personalization-background", L("Le fond d'écran Windows est utilisé partout, y compris dans la vue d'ensemble.", "The Windows wallpaper is used everywhere, including the Overview.")),
+                ComboRow(L("Arrière-plan de la vue d'ensemble", "Overview background"), null, o, nameof(o.Background),
+                    (OverviewBackground.BlurredWallpaper, "Fond d'écran flouté", "Blurred wallpaper"), (OverviewBackground.Wallpaper, "Fond d'écran assombri", "Dimmed wallpaper"), (OverviewBackground.Solid, "Couleur unie", "Solid color"))));
+    }
+
+    private static UIElement Thumbnail(Brush background, Brush back, Brush front, Brush? accent, bool selected, string label, Action click)
+    {
+        var canvas = new Canvas { Width = 148, Height = 98, ClipToBounds = true };
+        canvas.Children.Add(new WpfRectangle { Width = 148, Height = 98, Fill = background });
+        var w1 = new Border { Width = 70, Height = 46, CornerRadius = new CornerRadius(5), Background = back };
+        Canvas.SetLeft(w1, 58); Canvas.SetTop(w1, 14);
+        var w2 = new Border { Width = 74, Height = 48, CornerRadius = new CornerRadius(5), Background = front, BorderBrush = new SolidColorBrush(Color.FromArgb(0x30, 0, 0, 0)), BorderThickness = new Thickness(1) };
+        Canvas.SetLeft(w2, 20); Canvas.SetTop(w2, 38);
+        canvas.Children.Add(w1);
+        canvas.Children.Add(w2);
+        if (accent != null)
+        {
+            var dot = new Border { Width = 22, Height = 8, CornerRadius = new CornerRadius(4), Background = accent };
+            Canvas.SetLeft(dot, 30); Canvas.SetTop(dot, 72);
+            canvas.Children.Add(dot);
+        }
+        var frame = new Border
+        {
+            CornerRadius = new CornerRadius(10), BorderThickness = new Thickness(3), Padding = new Thickness(3),
+            Child = new Border { CornerRadius = new CornerRadius(7), Child = canvas, ClipToBounds = true },
+        };
+        if (selected) frame.SetResourceReference(Border.BorderBrushProperty, "Brush.Accent");
+        else frame.BorderBrush = Brushes.Transparent;
+        var stack = new StackPanel { Margin = new Thickness(10, 0, 10, 6), Cursor = Cursors.Hand, Background = Brushes.Transparent };
+        stack.Children.Add(frame);
+        stack.Children.Add(new TextBlock { Text = label, HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 6, 0, 0), FontSize = 13 });
+        stack.MouseLeftButtonUp += (_, _) => click();
+        return stack;
+    }
+
+    private static UIElement StyleCard(DesignStyle st, string name, bool selected, Action click)
+    {
+        Brush bg = st switch
+        {
+            DesignStyle.Ubuntu => new LinearGradientBrush(Color.FromRgb(0x77, 0x21, 0x6F), Color.FromRgb(0xE9, 0x54, 0x20), 30),
+            DesignStyle.PopOS => new LinearGradientBrush(Color.FromRgb(0x2A, 0x29, 0x28), Color.FromRgb(0x48, 0xB9, 0xC7), 30),
+            _ => new LinearGradientBrush(Color.FromRgb(0x1C, 0x71, 0xD8), Color.FromRgb(0x62, 0xA0, 0xEA), 30),
+        };
+        var accent = new SolidColorBrush(ThemeManager.AccentValue(st switch { DesignStyle.Ubuntu => AccentColor.Orange, DesignStyle.PopOS => AccentColor.Teal, _ => AccentColor.Blue }));
+        return Thumbnail(bg, new SolidColorBrush(Color.FromRgb(0x30, 0x30, 0x30)), new SolidColorBrush(Color.FromRgb(0xFA, 0xFA, 0xFA)), accent, selected, name, click);
+    }
+
+    private static UIElement ModeCard(ThemeMode mode, string label, bool selected, Action click)
+    {
+        var bg = new LinearGradientBrush(Color.FromRgb(0x2A, 0x5D, 0xB0), Color.FromRgb(0x63, 0x8C, 0xD8), 45);
+        Brush back = new SolidColorBrush(Color.FromRgb(0x2E, 0x2E, 0x2E));
+        Brush front = mode switch
+        {
+            ThemeMode.Dark => new SolidColorBrush(Color.FromRgb(0x24, 0x24, 0x24)),
+            ThemeMode.Light => new SolidColorBrush(Color.FromRgb(0xFA, 0xFA, 0xFA)),
+            _ => new LinearGradientBrush(new GradientStopCollection
+            {
+                new GradientStop(Color.FromRgb(0xFA, 0xFA, 0xFA), 0), new GradientStop(Color.FromRgb(0xFA, 0xFA, 0xFA), 0.5),
+                new GradientStop(Color.FromRgb(0x24, 0x24, 0x24), 0.5), new GradientStop(Color.FromRgb(0x24, 0x24, 0x24), 1),
+            }, 0),
+        };
+        return Thumbnail(bg, back, front, null, selected, label, click);
+    }
+
+    private static UIElement AccentDot(AccentColor a, bool selected, Action click)
+    {
+        Color c = a == AccentColor.Default
+            ? ThemeManager.AccentValue(ThemeManager.Style switch { DesignStyle.Ubuntu => AccentColor.Orange, DesignStyle.PopOS => AccentColor.Teal, _ => AccentColor.Blue })
+            : ThemeManager.AccentValue(a);
+        var grid = new Grid { Width = 34, Height = 34, Margin = new Thickness(5), Cursor = Cursors.Hand, Background = Brushes.Transparent,
+            ToolTip = a == AccentColor.Default ? L("Couleur du style", "Style colour") : a.ToString() };
+        grid.Children.Add(new WpfEllipse { StrokeThickness = 2, Stroke = selected ? new SolidColorBrush(c) : Brushes.Transparent });
+        grid.Children.Add(new WpfEllipse { Margin = new Thickness(selected ? 4 : 2), Fill = new SolidColorBrush(c) });
+        if (selected)
+        {
+            var check = new TextBlock { Text = "", Foreground = Brushes.White, FontSize = 13, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
+            check.SetResourceReference(TextBlock.FontFamilyProperty, "Font.Icons");
+            grid.Children.Add(check);
+        }
+        grid.MouseLeftButtonUp += (_, _) => click();
+        return grid;
+    }
+
+    // ---------------------------------------------------------------- Dock (Ubuntu "Desktop" panel layout)
+    private UIElement BuildDock()
+    {
+        var d = _settings.Current.Dock;
+        return Page(
+            Group(L("Dock", "Dock"), null,
+                ComboRow(L("Visibilité", "Visibility"), null, d, nameof(d.Visibility),
+                    (DockVisibility.OverviewOnly, "Vue d'ensemble uniquement (GNOME)", "Overview only (GNOME)"),
+                    (DockVisibility.AlwaysVisible, "Toujours visible", "Always visible"),
+                    (DockVisibility.Intellihide, "Masquage intelligent", "Intellihide"),
+                    (DockVisibility.AutoHide, "Masquage automatique", "Auto-hide")),
+                SwitchRow(L("Mode panneau", "Panel mode"), L("Le dock s'étend jusqu'aux bords de l'écran.", "The dock extends to the screen edge."), d, nameof(d.Extended)),
+                SliderRow(L("Taille des icônes", "Icon size"), null, d, nameof(d.IconSize), 24, 64, 2, v => $"{v:0}"),
+                ComboRow(L("Position sur l'écran", "Position on screen"), null, d, nameof(d.Position),
+                    (DockPosition.Bottom, "En bas", "Bottom"), (DockPosition.Left, "À gauche", "Left"), (DockPosition.Right, "À droite", "Right"))),
+            Group(L("Comportement", "Behavior"), null,
+                ComboRow(L("Clic sur l'application active", "Click on the focused app"), null, d, nameof(d.ActiveClick),
+                    (DockActiveClick.Minimize, "Réduire", "Minimize"), (DockActiveClick.CycleWindows, "Fenêtre suivante", "Cycle windows"), (DockActiveClick.ShowPreviews, "Afficher les aperçus", "Show previews")),
+                ComboRow(L("Effet au survol", "Hover effect"), null, d, nameof(d.HoverEffect),
+                    (DockHoverEffect.Highlight, "Surbrillance", "Highlight"), (DockHoverEffect.Zoom, "Zoom", "Zoom"), (DockHoverEffect.None, "Aucun", "None")),
+                SwitchRow(L("Isoler les espaces de travail", "Isolate workspaces"), L("N'indiquer comme ouvertes que les applications de l'espace actuel.", "Only show apps running on the current workspace."), d, nameof(d.IsolateWorkspaces)),
+                SwitchRow(L("Bouton Afficher les applications", "Show Applications button"), null, d, nameof(d.ShowAppsButton)),
+                SliderRow(L("Opacité", "Opacity"), null, d, nameof(d.BackgroundOpacity), 0, 1, 0.05, v => $"{v * 100:0} %")));
+    }
+
+    private UIElement BuildApps()
+    {
+        var rows = new List<UIElement>();
+        if (_apps != null)
+        {
+            foreach (var id in _apps.PinnedIds.ToList())
+            {
+                var app = _apps.FindById(id);
+                if (app == null) continue;
+                var remove = new Button { Content = "", Width = 28, Height = 28, FontSize = 9, ToolTip = Loc.T("Unpin") };
+                remove.SetResourceReference(StyleProperty, "RoundIconButton");
+                remove.Click += (_, _) => { _apps.Unpin(id); ShowPanelContent("apps"); };
+                var icon = new Image { Source = app.Icon, Width = 28, Height = 28 };
+                rows.Add(RowShell(app.Name, null, remove, icon));
+            }
+        }
+        var page = Page(
+            Group(L("Applications", "Apps"), null,
+                WinLink(L("Applications par défaut", "Default Apps"), "ms-settings:defaultapps"),
+                WinLink(L("Applications au démarrage", "Startup Apps"), "ms-settings:startupapps"),
+                WinLink(L("Applications installées", "Installed Apps"), "ms-settings:appsfeatures")));
+        page.Children.Add(rows.Count > 0
+            ? Group(L("Favoris", "Favorites"), L("Applications épinglées au dock. Glissez une application de la grille vers le dock pour l'ajouter.", "Apps pinned to the dock. Drag an app from the grid to the dock to add it."), rows.ToArray())
+            : Note(L("Aucune application épinglée.", "No pinned apps.")));
+        return page;
+    }
+
+    private UIElement BuildNotifications() => Page(
+        Group(null, null,
+            WinLink(L("Ne pas déranger", "Do Not Disturb"), "ms-settings:notifications"),
+            WinLink(L("Notifications de l'écran de verrouillage", "Lock Screen Notifications"), "ms-settings:notifications")),
+        Group(L("Applications", "Apps"), L("Les notifications sont gérées par Windows ; GnomeWin les affiche dans le panneau du calendrier.", "Notifications are managed by Windows; GnomeWin shows them in the calendar panel."),
+            WinLink(L("Notifications par application", "Notifications per app"), "ms-settings:notifications"),
+            WinLink(L("Autoriser l'accès aux notifications", "Allow notification access"), "ms-settings:privacy-notifications")));
+
+    private UIElement BuildSearch()
+    {
+        var o = _settings.Current.Overview;
+        return Page(
+            Note(L("Les résultats de recherche apparaissent quand vous tapez dans la vue d'ensemble.", "Search results appear when typing in the Activities Overview.")),
+            Group(L("Résultats de recherche", "Search Results"), null,
+                InfoRow(L("Applications", "Apps"), L("Toujours", "Always")),
+                InfoRow(L("Fenêtres ouvertes", "Open windows"), L("Toujours", "Always")),
+                SwitchRow(L("Paramètres", "Settings"), L("Pages des Paramètres Windows", "Windows Settings pages"), o, nameof(o.SearchWindowsSettings)),
+                SwitchRow(L("Fichiers récents", "Recent files"), null, o, nameof(o.SearchRecentFiles)),
+                SwitchRow(L("Calculatrice", "Calculator"), null, o, nameof(o.SearchCalculator))));
+    }
+
+    private UIElement BuildMouse() => Page(
+        Group(L("Souris", "Mouse"), null, WinLink(L("Souris", "Mouse"), "ms-settings:mousetouchpad")),
+        Group(L("Pavé tactile", "Touchpad"), null, WinLink(L("Pavé tactile", "Touchpad"), "ms-settings:devices-touchpad")));
+
+    private UIElement BuildPrinters() => Page(Group(null, null, WinLink(L("Imprimantes et scanners", "Printers & scanners"), "ms-settings:printers")));
+
+    private UIElement BuildPrivacy() => Page(Group(null, null,
+        WinLink(L("Confidentialité et sécurité", "Privacy & Security"), "ms-settings:privacy"),
+        WinLink(L("Sécurité Windows", "Windows Security"), "windowsdefender:"),
+        WinLink(L("Localisation", "Location"), "ms-settings:privacy-location")));
+
+    private UIElement BuildAccessibility()
+    {
+        var g = _settings.Current.General;
+        return Page(
+            Group(L("Vision", "Seeing"), null,
+                SwitchRow(L("Effets d'animation", "Animation Effects"), L("Les effets peuvent gêner ou ralentir les machines modestes.", "Effects can be distracting or slow on low-end machines."), g, nameof(g.AnimationsEnabled)),
+                ComboRow(L("Vitesse des animations", "Animation Speed"), null, g, nameof(g.AnimationSpeed), (AnimationSpeed.Normal, "Normale", "Normal"), (AnimationSpeed.Fast, "Rapide", "Fast"), (AnimationSpeed.Slow, "Lente", "Slow")),
+                WinLink(L("Contraste élevé et taille du texte", "High contrast and text size"), "ms-settings:easeofaccess-display")),
+            Group(L("Autres", "Other"), null,
+                WinLink(L("Narrateur", "Narrator"), "ms-settings:easeofaccess-narrator"),
+                WinLink(L("Loupe", "Magnifier"), "ms-settings:easeofaccess-magnifier")));
+    }
+
+    // ---------------------------------------------------------------- Keyboard (GNOME "Keyboard Shortcuts")
+    private UIElement BuildKeyboard()
+    {
+        var k = _settings.Current.Keyboard;
+        var names = new (string Key, string Fr, string En, bool System)[]
+        {
+            (nameof(ShellAction.ToggleOverview), "Afficher la vue d'ensemble", "Show the overview", true),
+            (nameof(ShellAction.ShowApplications), "Afficher toutes les applications", "Show all apps", true),
+            (nameof(ShellAction.ToggleNotifications), "Afficher la liste des notifications", "Show the notification list", true),
+            (nameof(ShellAction.ToggleQuickSettings), "Ouvrir le menu système", "Open the quick settings menu", true),
+            (nameof(ShellAction.OpenShellSettings), "Ouvrir les paramètres", "Open settings", true),
+            (nameof(ShellAction.AppSwitcher), "Changer d'application", "Switch applications", false),
+            (nameof(ShellAction.WorkspacePrevious), "Aller à l'espace de travail précédent", "Switch to workspace on the left", false),
+            (nameof(ShellAction.WorkspaceNext), "Aller à l'espace de travail suivant", "Switch to workspace on the right", false),
+            (nameof(ShellAction.MoveWindowToPreviousWorkspace), "Déplacer la fenêtre d'un espace vers la gauche", "Move window one workspace to the left", false),
+            (nameof(ShellAction.MoveWindowToNextWorkspace), "Déplacer la fenêtre d'un espace vers la droite", "Move window one workspace to the right", false),
+        };
+        var page = Page(Group(L("Saisie", "Input"), null,
+            SwitchRow(L("Touche Super", "Super key"), L("Ouvre la vue d'ensemble. Désactivé : aucun hook clavier, la touche Windows garde son comportement.", "Opens the overview. Off: no keyboard hook, the Windows key keeps its behaviour."), k, nameof(k.InterceptSuperKey)),
+            WinLink(L("Disposition du clavier", "Keyboard layout"), "ms-settings:regionlanguage")));
+        page.Children.Add(Group(L("Système", "System"), null, names.Where(n => n.System).Select(n => ShortcutRow(k, n.Key, L(n.Fr, n.En))).ToArray()));
+        page.Children.Add(Group(L("Navigation", "Navigation"), null, names.Where(n => !n.System).Select(n => ShortcutRow(k, n.Key, L(n.Fr, n.En))).ToArray()));
+        page.Children.Add(Group(L("Lanceurs", "Launchers"), null, Enumerable.Range(1, 9).Select(i => ShortcutRow(k, "LaunchDockItem" + i, L($"Lancer l'application {i} du dock", $"Launch dock app {i}"))).ToArray()));
+        page.Children.Add(Note(L("Cliquez sur un raccourci puis tapez la nouvelle combinaison (Échap : annuler, Retour arrière : désactiver, clic droit : rétablir). Urgence : Ctrl+Alt+Maj+F12 restaure Windows.",
+                                 "Click a shortcut then type the new combination (Esc: cancel, Backspace: disable, right-click: reset). Emergency: Ctrl+Alt+Shift+F12 restores Windows.")));
+        return page;
+    }
+
+    private UIElement ShortcutRow(KeyboardSettings k, string key, string title)
+    {
+        var keys = new WrapPanel { VerticalAlignment = VerticalAlignment.Center };
+        void Render(string? waiting = null)
+        {
+            keys.Children.Clear();
+            if (waiting != null) { keys.Children.Add(new TextBlock { Text = waiting, FontStyle = FontStyles.Italic }); return; }
+            var list = k.Bindings.TryGetValue(key, out var l) ? l : new List<string>();
+            if (list.Count == 0)
+            {
+                var off = new TextBlock { Text = L("Désactivé", "Disabled") };
+                off.SetResourceReference(TextBlock.ForegroundProperty, "Brush.FgDim");
+                keys.Children.Add(off);
+                return;
+            }
+            for (int i = 0; i < list.Count; i++)
+            {
+                if (i > 0) keys.Children.Add(new TextBlock { Text = "/", VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(6, 0, 6, 0) });
+                foreach (var part in list[i].Split('+')) keys.Children.Add(Keycap(part));
+            }
+        }
+        void SetBinding(List<string> value)
+        {
+            var dict = new Dictionary<string, List<string>>(k.Bindings, StringComparer.OrdinalIgnoreCase) { [key] = value };
+            k.Bindings = dict;
+            Render();
+        }
+        Render();
+        var row = RowShell(title, null, keys);
+        MakeActivatable(row, () =>
+        {
+            if (_hook == null || !_hook.IsRunning)
+            {
+                MessageBox.Show(this, L("Le hook clavier est inactif (mode sans échec ou touche Super désactivée).", "The keyboard hook is not running (safe mode or Super key disabled)."), Title);
+                return;
+            }
+            Render(L("Nouveau raccourci…", "New shortcut…"));
+            _hook.BeginCapture(hk => Dispatcher.BeginInvoke(() =>
+            {
+                if (hk is Hotkey h && h.IsValid)
+                    SetBinding(h.Key == 0x08 && h.Modifiers == HotkeyModifiers.None ? new List<string>() : new List<string> { h.ToString() });
+                else Render();
+            }));
+        });
+        var menu = new ContextMenu();
+        var reset = new MenuItem { Header = L("Rétablir le raccourci par défaut", "Reset to default") };
+        reset.Click += (_, _) => SetBinding(KeyboardSettings.DefaultBindings()[key]);
+        var clear = new MenuItem { Header = L("Désactiver", "Disable") };
+        clear.Click += (_, _) => SetBinding(new List<string>());
+        menu.Items.Add(reset);
+        menu.Items.Add(clear);
+        row.ContextMenu = menu;
+        return row;
+    }
+
+    private static UIElement Keycap(string text)
+    {
+        var b = new Border { CornerRadius = new CornerRadius(6), Padding = new Thickness(7, 2, 7, 2), Margin = new Thickness(2, 0, 2, 0), BorderThickness = new Thickness(1, 1, 1, 2) };
+        b.SetResourceReference(Border.BorderBrushProperty, "Brush.Separator");
+        b.SetResourceReference(Border.BackgroundProperty, "Brush.InputBg");
+        b.Child = new TextBlock { Text = text, FontSize = 12.5 };
+        return b;
+    }
+
+    // ---------------------------------------------------------------- System
+    private UIElement BuildSystem()
+    {
+        var g = _settings.Current.General;
+        string version = FileVersionInfo.GetVersionInfo(AppPaths.ExecutablePath).ProductVersion?.Split('+')[0] ?? "1.0";
+        return Page(
+            Group(L("Région et langue", "Region & Language"), null,
+                ComboRow(L("Langue de GnomeWin", "GnomeWin language"), L("Appliquée entièrement au prochain démarrage.", "Fully applied at next start."), g, nameof(g.Language),
+                    (UiLanguage.System, "Système", "System"), (UiLanguage.French, "Français", "French"), (UiLanguage.English, "Anglais", "English")),
+                WinLink(L("Langue et région de Windows", "Windows language & region"), "ms-settings:regionlanguage")),
+            Group(L("Date et heure", "Date & Time"), null, WinLink(L("Date et heure", "Date & Time"), "ms-settings:dateandtime")),
+            Group(L("Utilisateurs", "Users"), null, WinLink(L("Comptes", "Accounts"), "ms-settings:yourinfo")),
+            Group(L("Démarrage", "Startup"), null,
+                SwitchRow(L("Lancer GnomeWin à l'ouverture de session", "Launch GnomeWin at login"), null, g, nameof(g.LaunchAtStartup)),
+                SwitchRow(L("Remplacer la barre des tâches Windows", "Replace the Windows taskbar"), L("Masquage réversible, toujours restaurée à la fermeture.", "Reversible, always restored on exit."), g, nameof(g.ReplaceTaskbar))),
+            Group(L("Performances", "Performance"), null,
+                SwitchRow(L("Économie de mémoire", "Memory saver"), L("Rendu logiciel : environ 20 Mo de moins. Désactivez-le si les animations de la vue d'ensemble manquent de fluidité. Prend effet au prochain démarrage.", "Software rendering: about 20 MB less. Turn off if Overview animations are not smooth enough. Applies at next start."), g, nameof(g.LowMemoryMode))),
+            Group(L("À propos", "About"), null,
+                InfoRow("GnomeWin", version),
+                InfoRow(L("Système", "OS"), Environment.OSVersion.VersionString),
+                InfoRow(L("Mémoire utilisée par GnomeWin", "Memory used by GnomeWin"), $"{Environment.WorkingSet / 1048576} Mo"),
+                LinkRow(L("Diagnostic", "Diagnostics"), L("Copier le rapport dans le presse-papiers", "Copy the report to the clipboard"), () => { try { Clipboard.SetText(_diagnostics()); } catch { } }, external: false)),
+            Group(L("Maintenance", "Maintenance"), null,
+                LinkRow(L("Journaux", "Logs"), AppPaths.Logs, () => ShellLauncher.Open(AppPaths.Logs)),
+                LinkRow(L("Dossier de configuration", "Settings folder"), AppPaths.Root, () => ShellLauncher.Open(AppPaths.Root)),
+                LinkRow(L("Exporter les paramètres…", "Export settings…"), null, ExportSettings, external: false),
+                LinkRow(L("Importer des paramètres…", "Import settings…"), null, ImportSettings, external: false),
+                ButtonRow(L("Réinitialiser les paramètres", "Reset settings"), L("Une sauvegarde est conservée.", "A backup is kept."), L("Réinitialiser", "Reset"), ResetSettings),
+                ButtonRow(L("Quitter GnomeWin", "Quit GnomeWin"), L("Réaffiche la barre des tâches Windows et ferme le shell.", "Shows the Windows taskbar again and closes the shell."), L("Quitter", "Quit"), _restoreAndQuit, destructive: true)));
+    }
+
+    private void ExportSettings()
+    {
+        var dlg = new SaveFileDialog { FileName = "gnomewin-settings.json", Filter = "JSON|*.json" };
+        if (dlg.ShowDialog(this) == true) _settings.Export(dlg.FileName);
+    }
+
+    private void ImportSettings()
+    {
+        var dlg = new OpenFileDialog { Filter = "JSON|*.json" };
+        if (dlg.ShowDialog(this) != true) return;
+        try { _settings.Import(dlg.FileName); ShowPanelContent("system"); }
+        catch (Exception ex) { MessageBox.Show(this, ex.Message, Title, MessageBoxButton.OK, MessageBoxImage.Error); }
+    }
+
+    private void ResetSettings()
+    {
+        if (MessageBox.Show(this, L("Revenir aux paramètres par défaut ?", "Reset to defaults?"), Title, MessageBoxButton.YesNo) != MessageBoxResult.Yes) return;
+        _settings.ResetToDefaults();
+        ShowPanelContent("system");
+    }
+}

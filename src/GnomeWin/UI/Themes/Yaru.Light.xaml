@@ -1,0 +1,35 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <!-- Yaru light (Ubuntu) palette. As on Ubuntu, the top bar and the dock stay dark. -->
+    <Color x:Key="Color.Accent">#FFE95420</Color>
+    <Color x:Key="Color.DockBase">#FF1D1D1D</Color>
+    <SolidColorBrush x:Key="Brush.Accent" Color="#FFE95420" />
+    <SolidColorBrush x:Key="Brush.AccentHover" Color="#FFD2481A" />
+    <SolidColorBrush x:Key="Brush.OnAccent" Color="#FFFFFFFF" />
+    <SolidColorBrush x:Key="Brush.PanelBg" Color="#FF000000" />
+    <SolidColorBrush x:Key="Brush.PanelFg" Color="#FFF7F7F7" />
+    <SolidColorBrush x:Key="Brush.PanelHover" Color="#33FFFFFF" />
+    <SolidColorBrush x:Key="Brush.PopupBg" Color="#FFFAFAFA" />
+    <SolidColorBrush x:Key="Brush.PopupBorder" Color="#1F000000" />
+    <SolidColorBrush x:Key="Brush.CardBg" Color="#FFE6E6E6" />
+    <SolidColorBrush x:Key="Brush.CardHover" Color="#FFDADADA" />
+    <SolidColorBrush x:Key="Brush.Fg" Color="#FF3D3D3D" />
+    <SolidColorBrush x:Key="Brush.FgDim" Color="#B33D3D3D" />
+    <SolidColorBrush x:Key="Brush.FgFaint" Color="#663D3D3D" />
+    <SolidColorBrush x:Key="Brush.ItemHover" Color="#12000000" />
+    <SolidColorBrush x:Key="Brush.ItemSelected" Color="#21000000" />
+    <SolidColorBrush x:Key="Brush.Separator" Color="#1A000000" />
+    <SolidColorBrush x:Key="Brush.InputBg" Color="#FFFFFFFF" />
+    <SolidColorBrush x:Key="Brush.WindowBg" Color="#FFFAFAFA" />
+    <SolidColorBrush x:Key="Brush.SidebarBg" Color="#FFEBEBEB" />
+    <SolidColorBrush x:Key="Brush.Danger" Color="#FFC7162B" />
+    <SolidColorBrush x:Key="Brush.Success" Color="#FF0E8420" />
+    <SolidColorBrush x:Key="Brush.Warning" Color="#FFF99B11" />
+    <SolidColorBrush x:Key="Brush.OverviewFg" Color="#FFFFFFFF" />
+    <SolidColorBrush x:Key="Brush.OverviewSolid" Color="#FF3B3B3B" />
+    <SolidColorBrush x:Key="Brush.OverviewDim" Color="#73000000" />
+    <SolidColorBrush x:Key="Brush.SearchBg" Color="#40FFFFFF" />
+    <SolidColorBrush x:Key="Brush.WindowHighlight" Color="#E6FFFFFF" />
+    <SolidColorBrush x:Key="Brush.Indicator" Color="#FFE95420" />
+    <SolidColorBrush x:Key="Brush.DockFg" Color="#FFF7F7F7" />
+</ResourceDictionary>

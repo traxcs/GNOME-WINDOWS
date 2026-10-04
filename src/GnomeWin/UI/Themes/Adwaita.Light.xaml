@@ -1,0 +1,34 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <SolidColorBrush x:Key="Brush.Accent" Color="#FF3584E4" />
+    <SolidColorBrush x:Key="Brush.AccentHover" Color="#FF1C71D8" />
+    <SolidColorBrush x:Key="Brush.CardBg" Color="#FFE6E6E8" />
+    <SolidColorBrush x:Key="Brush.CardHover" Color="#FFDADADC" />
+    <SolidColorBrush x:Key="Brush.Danger" Color="#FFC01C28" />
+    <SolidColorBrush x:Key="Brush.DockFg" Color="#FF222226" />
+    <SolidColorBrush x:Key="Brush.Fg" Color="#FF222226" />
+    <SolidColorBrush x:Key="Brush.FgDim" Color="#A6222226" />
+    <SolidColorBrush x:Key="Brush.FgFaint" Color="#66222226" />
+    <SolidColorBrush x:Key="Brush.Indicator" Color="#FF222226" />
+    <SolidColorBrush x:Key="Brush.InputBg" Color="#FFFFFFFF" />
+    <SolidColorBrush x:Key="Brush.ItemHover" Color="#12000000" />
+    <SolidColorBrush x:Key="Brush.ItemSelected" Color="#21000000" />
+    <SolidColorBrush x:Key="Brush.OnAccent" Color="#FFFFFFFF" />
+    <SolidColorBrush x:Key="Brush.OverviewDim" Color="#73000000" />
+    <SolidColorBrush x:Key="Brush.OverviewFg" Color="#FFFFFFFF" />
+    <SolidColorBrush x:Key="Brush.OverviewSolid" Color="#FF3D3D42" />
+    <SolidColorBrush x:Key="Brush.PanelBg" Color="#FF000000" />
+    <SolidColorBrush x:Key="Brush.PanelFg" Color="#FFFFFFFF" />
+    <SolidColorBrush x:Key="Brush.PanelHover" Color="#33FFFFFF" />
+    <SolidColorBrush x:Key="Brush.PopupBg" Color="#FFFAFAFB" />
+    <SolidColorBrush x:Key="Brush.PopupBorder" Color="#1F000000" />
+    <SolidColorBrush x:Key="Brush.SearchBg" Color="#40FFFFFF" />
+    <SolidColorBrush x:Key="Brush.Separator" Color="#1A000000" />
+    <SolidColorBrush x:Key="Brush.SidebarBg" Color="#FFEBEBED" />
+    <SolidColorBrush x:Key="Brush.Success" Color="#FF26A269" />
+    <SolidColorBrush x:Key="Brush.Warning" Color="#FFC88800" />
+    <SolidColorBrush x:Key="Brush.WindowBg" Color="#FFFAFAFB" />
+    <SolidColorBrush x:Key="Brush.WindowHighlight" Color="#E6FFFFFF" />
+    <Color x:Key="Color.Accent">#FF3584E4</Color>
+    <Color x:Key="Color.DockBase">#FFE8E8E8</Color>
+</ResourceDictionary>

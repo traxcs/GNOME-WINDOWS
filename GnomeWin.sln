@@ -1,0 +1,35 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{5C288935-D9E1-403A-A39A-51B939038A3E}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GnomeWin", "src\GnomeWin\GnomeWin.csproj", "{6A2F8C1F-9820-4A2D-8288-1FCADC1C931B}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{D825B823-C2C2-4583-80B7-33E2A3CF060F}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GnomeWin.Tests", "tests\GnomeWin.Tests\GnomeWin.Tests.csproj", "{06BF8D28-A397-468E-A274-D2F77A0CC7D8}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{6A2F8C1F-9820-4A2D-8288-1FCADC1C931B}.Debug|Any CPU.ActiveCfg = Debug|x64
+		{6A2F8C1F-9820-4A2D-8288-1FCADC1C931B}.Debug|Any CPU.Build.0 = Debug|x64
+		{6A2F8C1F-9820-4A2D-8288-1FCADC1C931B}.Release|Any CPU.ActiveCfg = Release|x64
+		{6A2F8C1F-9820-4A2D-8288-1FCADC1C931B}.Release|Any CPU.Build.0 = Release|x64
+		{06BF8D28-A397-468E-A274-D2F77A0CC7D8}.Debug|Any CPU.ActiveCfg = Debug|x64
+		{06BF8D28-A397-468E-A274-D2F77A0CC7D8}.Debug|Any CPU.Build.0 = Debug|x64
+		{06BF8D28-A397-468E-A274-D2F77A0CC7D8}.Release|Any CPU.ActiveCfg = Release|x64
+		{06BF8D28-A397-468E-A274-D2F77A0CC7D8}.Release|Any CPU.Build.0 = Release|x64
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{6A2F8C1F-9820-4A2D-8288-1FCADC1C931B} = {5C288935-D9E1-403A-A39A-51B939038A3E}
+		{06BF8D28-A397-468E-A274-D2F77A0CC7D8} = {D825B823-C2C2-4583-80B7-33E2A3CF060F}
+	EndGlobalSection
+EndGlobal
