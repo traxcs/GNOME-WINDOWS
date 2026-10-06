@@ -41,7 +41,7 @@ public partial class TopBarView : UserControl
         count = Math.Max(1, count);
         while (WorkspaceDots.Children.Count < count)
         {
-            var dot = new Rectangle { Height = 7, Width = 7, RadiusX = 3.5, RadiusY = 3.5, Margin = new Thickness(2.5, 0, 2.5, 0) };
+            var dot = new Rectangle { Height = 8, Width = 8, RadiusX = 4, RadiusY = 4, Margin = new Thickness(2.5, 0, 2.5, 0) };
             dot.SetResourceReference(Shape.FillProperty, "Brush.PanelFg");
             WorkspaceDots.Children.Add(dot);
         }
@@ -50,7 +50,7 @@ public partial class TopBarView : UserControl
         {
             var dot = (Rectangle)WorkspaceDots.Children[i];
             bool active = i == current;
-            Anim.Animate(dot, WidthProperty, active ? 28 : 7, 200);
+            Anim.Animate(dot, WidthProperty, active ? 28 : 8, 200);
             dot.Opacity = active ? 1 : 0.55;
         }
     }

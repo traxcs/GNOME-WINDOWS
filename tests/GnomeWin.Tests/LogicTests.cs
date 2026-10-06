@@ -61,6 +61,17 @@ public class HotkeyTests
 
 public class SearchTests
 {
+    [Fact]
+    public void List_providers_stop_at_five_rows_and_report_the_rest()
+    {
+        var service = new SearchService();
+        var results = service.Search("e", Array.Empty<GnomeWin.Core.AppEntry>(), Array.Empty<GnomeWin.Core.WindowInfo>(),
+            new SearchOptions { Files = false });
+        Assert.Equal(5, SearchResults.MaxListRows);
+        Assert.True(results.Settings.Count <= SearchResults.MaxListRows);
+        if (results.MoreSettings > 0) Assert.Equal(SearchResults.MaxListRows, results.Settings.Count);
+    }
+
     private static int Score(string q, string c) => TextMatcher.Score(TextMatcher.Normalize(q), TextMatcher.Normalize(c));
 
     [Fact]

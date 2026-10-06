@@ -9,6 +9,12 @@ namespace GnomeWin.Shell.Search;
 
 public sealed class SearchResultsView : Grid
 {
+    private const double SectionSpacing = 18, CardPadding = 12, CardMargin = 12, CardRadius = 24;
+    private const double RowSpacing = 6, RowRadius = 13, TitleSpacing = 12;
+
+    private static readonly Brush HoverBrush = new SolidColorBrush(Color.FromArgb(0x1F, 0xFF, 0xFF, 0xFF));
+    private static readonly Brush SelectedBrush = new SolidColorBrush(Color.FromArgb(0x40, 0xFF, 0xFF, 0xFF));
+
     private readonly StackPanel _root = new() { HorizontalAlignment = HorizontalAlignment.Center, MaxWidth = 900, MinWidth = 600 };
     private readonly ScrollViewer _scroll;
     private readonly List<(SearchResult Result, Border Element)> _items = new();
@@ -37,29 +43,72 @@ public sealed class SearchResultsView : Grid
             return;
         }
 
-        if (results.Calculation != null) AddSection(Loc.T("Calculator"), new[] { results.Calculation }, asTiles: false);
-        if (results.Apps.Count > 0) AddSection(Loc.T("Applications"), results.Apps, asTiles: true);
-        if (results.Windows.Count > 0) AddSection(Loc.T("OpenWindows"), results.Windows, asTiles: false);
-        if (results.Settings.Count > 0) AddSection(Loc.T("WindowsSettings"), results.Settings, asTiles: false);
-        if (results.Files.Count > 0) AddSection(Loc.T("RecentFiles"), results.Files, asTiles: false);
+        if (results.Apps.Count > 0) AddAppRow(results.Apps);
+        if (results.Calculation != null) AddProvider("", Loc.T("Calculator"), new[] { results.Calculation }, 0);
+        if (results.Windows.Count > 0) AddProvider("", Loc.T("OpenWindows"), results.Windows, results.MoreWindows);
+        if (results.Settings.Count > 0) AddProvider("", Loc.T("WindowsSettings"), results.Settings, results.MoreSettings);
+        if (results.Files.Count > 0) AddProvider("", Loc.T("RecentFiles"), results.Files, results.MoreFiles);
         UpdateSelection();
         _scroll.ScrollToTop();
     }
 
-    private void AddSection(string title, IEnumerable<SearchResult> results, bool asTiles)
+    private void AddAppRow(IEnumerable<SearchResult> apps)
     {
-        var header = new TextBlock { Text = title, FontSize = 13, FontWeight = FontWeights.SemiBold, Opacity = 0.75, Margin = new Thickness(12, 14, 0, 6) };
-        header.SetResourceReference(TextBlock.ForegroundProperty, "Brush.OverviewFg");
-        var card = new Border { CornerRadius = new CornerRadius(18), Padding = new Thickness(8), Background = new SolidColorBrush(Color.FromArgb(0x33, 0x00, 0x00, 0x00)) };
-        Panel panel = asTiles ? new WrapPanel() : new StackPanel();
+        var panel = new WrapPanel { HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 4, 0, 8) };
+        foreach (var r in apps)
+        {
+            var tile = Tile(r);
+            _items.Add((r, tile));
+            panel.Children.Add(tile);
+        }
+        _root.Children.Add(panel);
+    }
+
+    private void AddProvider(string glyph, string name, IEnumerable<SearchResult> results, int more)
+    {
+        var grid = new Grid();
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(168) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition());
+
+        var header = new Grid { Margin = new Thickness(6, 2, 10, 2), VerticalAlignment = VerticalAlignment.Top };
+        header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        header.ColumnDefinitions.Add(new ColumnDefinition());
+        var icon = new TextBlock { Text = glyph, FontSize = 20, VerticalAlignment = VerticalAlignment.Top, Opacity = 0.9 };
+        icon.SetResourceReference(TextBlock.FontFamilyProperty, "Font.Icons");
+        icon.SetResourceReference(TextBlock.ForegroundProperty, "Brush.OverviewFg");
+        header.Children.Add(icon);
+        var titles = new StackPanel { Margin = new Thickness(10, 0, 0, 0) };
+        var label = new TextBlock { Text = name, FontSize = 14, FontWeight = FontWeights.SemiBold, TextWrapping = TextWrapping.Wrap };
+        label.SetResourceReference(TextBlock.ForegroundProperty, "Brush.OverviewFg");
+        titles.Children.Add(label);
+        if (more > 0)
+        {
+            var moreLabel = new TextBlock { Text = string.Format(Loc.T("MoreResults"), more), FontSize = 13, Opacity = 0.65, Margin = new Thickness(0, 2, 0, 0) };
+            moreLabel.SetResourceReference(TextBlock.ForegroundProperty, "Brush.OverviewFg");
+            titles.Children.Add(moreLabel);
+        }
+        Grid.SetColumn(titles, 1);
+        header.Children.Add(titles);
+        grid.Children.Add(header);
+
+        var rows = new StackPanel();
         foreach (var r in results)
         {
-            var el = asTiles ? Tile(r) : Row(r);
-            _items.Add((r, el));
-            panel.Children.Add(el);
+            var row = Row(r, name);
+            _items.Add((r, row));
+            rows.Children.Add(row);
         }
-        card.Child = panel;
-        _root.Children.Add(header);
+        Grid.SetColumn(rows, 1);
+        grid.Children.Add(rows);
+
+        var card = new Border
+        {
+            Child = grid,
+            CornerRadius = new CornerRadius(CardRadius),
+            Padding = new Thickness(CardPadding),
+            Margin = new Thickness(CardMargin, 0, CardMargin, SectionSpacing),
+        };
+        card.SetResourceReference(Border.BackgroundProperty, "Brush.OverlayBg");
         _root.Children.Add(card);
     }
 
@@ -73,38 +122,40 @@ public sealed class SearchResultsView : Grid
         return Wrap(r, stack, new Thickness(4), new Thickness(4, 4, 4, 8));
     }
 
-    private Border Row(SearchResult r)
+    private Border Row(SearchResult r, string providerName)
     {
         var g = new Grid();
-        g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(40) });
-        g.ColumnDefinitions.Add(new ColumnDefinition());
-        if (r.Icon != null) g.Children.Add(new Image { Source = r.Icon, Width = 28, Height = 28 });
+        g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(34) });
+        g.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        if (r.Icon != null) g.Children.Add(new Image { Source = r.Icon, Width = 24, Height = 24, VerticalAlignment = VerticalAlignment.Center });
         else
         {
-            var glyph = new TextBlock { Text = r.Glyph ?? "", FontSize = 18, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
+            var glyph = new TextBlock { Text = r.Glyph ?? "", FontSize = 17, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
             glyph.SetResourceReference(TextBlock.FontFamilyProperty, "Font.Icons");
             glyph.SetResourceReference(TextBlock.ForegroundProperty, "Brush.OverviewFg");
             g.Children.Add(glyph);
         }
-        var texts = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(8, 0, 0, 0) };
-        var title = new TextBlock { Text = r.Title, FontSize = 14, TextTrimming = TextTrimming.CharacterEllipsis };
+
+        g.ColumnDefinitions.Add(new ColumnDefinition());
+        var title = new TextBlock { Text = r.Title, FontSize = 14, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(6, 0, 0, 0), TextTrimming = TextTrimming.CharacterEllipsis };
         title.SetResourceReference(TextBlock.ForegroundProperty, "Brush.OverviewFg");
-        texts.Children.Add(title);
-        if (!string.IsNullOrEmpty(r.Subtitle))
+        Grid.SetColumn(title, 1);
+        g.Children.Add(title);
+        string? description = string.Equals(r.Subtitle, providerName, StringComparison.Ordinal) ? null : r.Subtitle;
+        if (!string.IsNullOrEmpty(description))
         {
-            var sub = new TextBlock { Text = r.Subtitle, FontSize = 12, Opacity = 0.7, TextTrimming = TextTrimming.CharacterEllipsis };
+            var sub = new TextBlock { Text = description, FontSize = 13, Opacity = 0.65, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(TitleSpacing, 0, 0, 0), TextTrimming = TextTrimming.CharacterEllipsis };
             sub.SetResourceReference(TextBlock.ForegroundProperty, "Brush.OverviewFg");
-            texts.Children.Add(sub);
+            Grid.SetColumn(sub, 2);
+            g.Children.Add(sub);
         }
-        Grid.SetColumn(texts, 1);
-        g.Children.Add(texts);
-        return Wrap(r, g, new Thickness(0, 1, 0, 1), new Thickness(10, 8, 10, 8));
+        return Wrap(r, g, new Thickness(0, 0, 0, RowSpacing), new Thickness(8, 7, 10, 7), RowRadius);
     }
 
-    private Border Wrap(SearchResult r, UIElement content, Thickness margin, Thickness padding)
+    private Border Wrap(SearchResult r, UIElement content, Thickness margin, Thickness padding, double radius = 12)
     {
-        var b = new Border { Child = content, CornerRadius = new CornerRadius(12), Margin = margin, Padding = padding, Background = Brushes.Transparent, Cursor = Cursors.Hand };
-        b.MouseEnter += (_, _) => { if (!IsSelectedElement(b)) b.Background = new SolidColorBrush(Color.FromArgb(0x1F, 0xFF, 0xFF, 0xFF)); };
+        var b = new Border { Child = content, CornerRadius = new CornerRadius(radius), Margin = margin, Padding = padding, Background = Brushes.Transparent, Cursor = Cursors.Hand };
+        b.MouseEnter += (_, _) => { if (!IsSelectedElement(b)) b.Background = HoverBrush; };
         b.MouseLeave += (_, _) => { if (!IsSelectedElement(b)) b.Background = Brushes.Transparent; };
         b.MouseLeftButtonUp += (_, _) => Activated?.Invoke(r);
         b.MouseRightButtonUp += (_, e) => { ContextRequested?.Invoke(r, b); e.Handled = true; };
@@ -116,7 +167,7 @@ public sealed class SearchResultsView : Grid
     private void UpdateSelection()
     {
         for (int i = 0; i < _items.Count; i++)
-            _items[i].Element.Background = i == _selected ? new SolidColorBrush(Color.FromArgb(0x40, 0xFF, 0xFF, 0xFF)) : Brushes.Transparent;
+            _items[i].Element.Background = i == _selected ? SelectedBrush : Brushes.Transparent;
         if (_selected >= 0 && _selected < _items.Count) _items[_selected].Element.BringIntoView();
     }
 

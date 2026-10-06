@@ -89,7 +89,7 @@ public sealed class ConsoleWindow : Window
     {
         _fontSize = Math.Clamp(_prefs.FontSize, 8, 32);
         Title = "Console";
-        Icon = System.Windows.Media.Imaging.BitmapFrame.Create(new Uri("pack://application:,,,/GnomeWin;component/Assets/Console.ico"));
+        Icon = EmbeddedIcon.Window("Console.ico");
         Width = 860;
         Height = 560;
         MinWidth = 360;

@@ -138,11 +138,7 @@ public sealed class ShellHost : IDisposable
 
         if (_safeMode)
             _notifications.AddShellNotice(Loc.IsFrench ? "Mode sans échec" : "Safe mode", Loc.T("SafeModeBanner"));
-        if (!g.FirstRunDone || _options.OpenSettings || _safeMode)
-        {
-            g.FirstRunDone = true;
-            _ui.BeginInvoke(OpenSettingsWindow, DispatcherPriority.Background);
-        }
+        if (_options.OpenSettings) _ui.BeginInvoke(OpenSettingsWindow, DispatcherPriority.Background);
         if (_options.OpenOverview) _ui.BeginInvoke(() => _overview.Open(), DispatcherPriority.Background);
         if (_options.OpenApps) _ui.BeginInvoke(() => _overview.Open(OverviewView.Applications), DispatcherPriority.Background);
         if (_options.SearchText != null) _ui.BeginInvoke(() => _overview.OpenWithSearch(_options.SearchText), DispatcherPriority.Background);

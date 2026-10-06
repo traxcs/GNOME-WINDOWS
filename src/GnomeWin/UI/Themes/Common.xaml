@@ -1,5 +1,6 @@
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:ui="clr-namespace:GnomeWin.UI">
 
     <!-- Ubuntu font (UFL licence, embedded) with Windows fallbacks -->
     <FontFamily x:Key="Font.Ui">pack://application:,,,/GnomeWin;component/Assets/Fonts/#Ubuntu, Segoe UI Variable Text, Segoe UI</FontFamily>
@@ -329,10 +330,16 @@
                         <Trigger Property="Text" Value="">
                             <Setter TargetName="Placeholder" Property="Visibility" Value="Visible" />
                         </Trigger>
-                        <Trigger Property="IsKeyboardFocused" Value="True">
+                        <!-- GNOME: accent ring once the entry is clicked or typed in (see UI.FocusRing),
+                             not merely because it took the focus when the Overview opened. -->
+                        <MultiTrigger>
+                            <MultiTrigger.Conditions>
+                                <Condition Property="IsKeyboardFocused" Value="True" />
+                                <Condition Property="ui:FocusRing.IsVisible" Value="True" />
+                            </MultiTrigger.Conditions>
                             <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource Brush.Accent}" />
-                        </Trigger>
-                        <!-- GNOME: the hint disappears as soon as the entry has the focus. -->
+                        </MultiTrigger>
+                        <!-- GNOME: the hint fades as soon as the entry has the focus. -->
                         <MultiTrigger>
                             <MultiTrigger.Conditions>
                                 <Condition Property="IsKeyboardFocused" Value="True" />

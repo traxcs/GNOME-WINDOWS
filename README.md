@@ -41,7 +41,9 @@ l'expérience GNOME Shell sur Windows 10 (2004 / build 19041 et plus) et Windows
 9. [Limitations connues](#limitations-connues)
 10. [Dépannage](#dépannage)
 11. [Récupération si la barre des tâches a disparu](#récupération-si-la-barre-des-tâches-a-disparu)
-12. [Ligne de commande](#ligne-de-commande)
+12. [Console (terminal)](#console-terminal)
+13. [Ligne de commande](#ligne-de-commande)
+14. [Crédits](#crédits)
 
 ---
 
@@ -380,5 +382,20 @@ GnomeWin.exe --install          installe pour l'utilisateur courant
 GnomeWin.exe --uninstall [--quiet]
 GnomeWin.exe --verbose          journalisation détaillée
 ```
+
+## Crédits
+
+Le design reproduit est celui de **GNOME Shell**, créé par le [projet GNOME](https://gitlab.gnome.org/GNOME/gnome-shell)
+(GPL-2.0-or-later), et du thème **Yaru** d'Ubuntu, par Canonical et la communauté Ubuntu. GnomeWin est une
+réécriture indépendante en C# / WPF : **aucun code de GNOME Shell n'est copié ni redistribué**. Seules des
+valeurs de mise en page (tailles, marges, arrondis, couleurs) sont reprises de leur source, et chacune est
+citée en commentaire à l'endroit où elle sert.
+
+GnomeWin **n'est ni affilié ni approuvé** par le projet GNOME ni par Canonical. « GNOME » est une marque de la
+GNOME Foundation, « Ubuntu » une marque de Canonical Ltd.
+
+Le détail fichier par fichier est dans [CREDITS.md](CREDITS.md) : polices embarquées, Dash to Dock, Yaru.
+
+---
 
 Licence : MIT.

@@ -43,7 +43,6 @@ public sealed class GeneralSettings : ObservableObject
     private UiLanguage _language = UiLanguage.System;
     private bool _replaceTaskbar = true;
     private bool _showTopBar = true;
-    private bool _firstRunDone;
     private bool _verboseLogging;
     private bool _lowMemory = true;
     private AccentColor _accent = AccentColor.Default;
@@ -60,7 +59,6 @@ public sealed class GeneralSettings : ObservableObject
     public UiLanguage Language { get => _language; set => Set(ref _language, value); }
     public bool ReplaceTaskbar { get => _replaceTaskbar; set => Set(ref _replaceTaskbar, value); }
     public bool ShowTopBar { get => _showTopBar; set => Set(ref _showTopBar, value); }
-    public bool FirstRunDone { get => _firstRunDone; set => Set(ref _firstRunDone, value); }
     public bool VerboseLogging { get => _verboseLogging; set => Set(ref _verboseLogging, value); }
     public bool LowMemoryMode { get => _lowMemory; set => Set(ref _lowMemory, value); }
     public bool ShowBatteryIcon { get => _showBatteryIcon; set => Set(ref _showBatteryIcon, value); }

@@ -31,7 +31,7 @@ public sealed class OverviewWindow : ShellWindow
     public MonitorInfo Monitor { get; private set; }
     public bool IsPrimarySurface { get; }
     public Canvas PreviewCanvas { get; } = new() { Background = Brushes.Transparent };
-    public TextBox SearchBox { get; } = new() { Width = 380 };
+    public TextBox SearchBox { get; } = new() { Width = 360 };
     public WorkspaceStrip Strip { get; } = new();
     public Grid MainArea { get; } = new();
     public AppGridView AppGrid { get; } = new() { Visibility = Visibility.Collapsed };
@@ -71,6 +71,7 @@ public sealed class OverviewWindow : ShellWindow
         {
             SearchBox.SetResourceReference(StyleProperty, "SearchBox");
             SearchBox.Tag = Loc.T("Search");
+            FocusRing.Track(SearchBox);
             SearchBox.HorizontalAlignment = HorizontalAlignment.Center;
             SearchBox.Margin = new Thickness(0, 18, 0, 0);
             _top.Children.Add(SearchBox);

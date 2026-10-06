@@ -37,6 +37,7 @@ public static class Loc
         ["RecentFiles"] = ("Fichiers récents", "Recent files"),
         ["Calculator"] = ("Calculatrice", "Calculator"),
         ["NoResults"] = ("Aucun résultat", "No results"),
+        ["MoreResults"] = ("{0} de plus", "{0} more"),
         ["Workspace"] = ("Espace de travail {0}", "Workspace {0}"),
         ["NewWorkspace"] = ("Nouvel espace de travail", "New workspace"),
         ["RemoveWorkspace"] = ("Supprimer l'espace de travail", "Remove workspace"),

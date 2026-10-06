@@ -177,6 +177,7 @@ public sealed class OverviewController : IDisposable
             if (primary != null)
             {
                 primary.Window.SearchBox.Text = string.Empty;
+                UI.FocusRing.Reset(primary.Window.SearchBox);
                 primary.Window.ForceActivate();
                 primary.Window.SearchBox.Focus();
                 Keyboard.Focus(primary.Window.SearchBox);

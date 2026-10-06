@@ -65,7 +65,7 @@ Publisher: $Publisher
 PackageName: GnomeWin
 $(if ($PackageUrl) { "PackageUrl: $PackageUrl" })
 License: MIT
-ShortDescription: L'expérience GNOME Shell / Ubuntu pour Windows 11 (vue d'ensemble, dock, espaces de travail).
+ShortDescription: L'expérience GNOME Shell / Ubuntu pour Windows (vue d'ensemble, dock, espaces de travail).
 Description: |-
   Shell de bureau réversible : vue d'ensemble avec aperçus en direct, Ubuntu Dock, espaces de travail
   dynamiques (bureaux virtuels Windows), grille d'applications, recherche, barre supérieure et réglages

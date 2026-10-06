@@ -17,6 +17,7 @@
     <SolidColorBrush x:Key="Brush.OverviewDim" Color="#73000000" />
     <SolidColorBrush x:Key="Brush.OverviewFg" Color="#FFFFFFFF" />
     <SolidColorBrush x:Key="Brush.OverviewSolid" Color="#FF3D3D42" />
+    <SolidColorBrush x:Key="Brush.OverlayBg" Color="#FF38383B" />
     <SolidColorBrush x:Key="Brush.PanelBg" Color="#FF000000" />
     <SolidColorBrush x:Key="Brush.PanelFg" Color="#FFFFFFFF" />
     <SolidColorBrush x:Key="Brush.PanelHover" Color="#33FFFFFF" />

@@ -304,14 +304,14 @@ internal sealed class QuickToggle : Border
     public QuickToggle(string glyph, string title, bool hasMenu)
     {
         Height = 48;
-        Margin = new Thickness(4);
+        Margin = new Thickness(6);
         CornerRadius = new CornerRadius(12);
         ClipToBounds = true;
         Cursor = Cursors.Hand;
         ToolTip = title;
 
         _icon = QuickSettingsWindow.Glyph(glyph, 16);
-        _title = new TextBlock { Text = title, FontWeight = FontWeights.SemiBold, FontSize = 13, TextTrimming = TextTrimming.CharacterEllipsis };
+        _title = new TextBlock { Text = title, FontWeight = FontWeights.SemiBold, FontSize = 14, TextTrimming = TextTrimming.CharacterEllipsis };
         _subtitle = new TextBlock { FontSize = 12, Opacity = 0.85, TextTrimming = TextTrimming.CharacterEllipsis, Visibility = Visibility.Collapsed };
         var texts = new StackPanel { Margin = new Thickness(12, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
         texts.Children.Add(_title);

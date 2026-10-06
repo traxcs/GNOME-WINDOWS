@@ -21,11 +21,17 @@ public sealed class SearchResult
 
 public sealed class SearchResults
 {
+    public const int MaxListRows = 5;
+
     public List<SearchResult> Apps { get; } = new();
     public List<SearchResult> Windows { get; } = new();
     public List<SearchResult> Settings { get; } = new();
     public List<SearchResult> Files { get; } = new();
     public SearchResult? Calculation { get; set; }
+
+    public int MoreWindows { get; set; }
+    public int MoreSettings { get; set; }
+    public int MoreFiles { get; set; }
 
     public IEnumerable<SearchResult> All()
     {
@@ -121,11 +127,14 @@ public sealed class SearchService
             .Take(12)
             .Select(x => new SearchResult { Kind = SearchResultKind.Application, Title = x.a.Name, Icon = x.a.Icon, App = x.a, Score = x.s }));
 
-        results.Windows.AddRange(windows
+        var windowMatches = windows
             .Select(w => (w, s: Math.Max(TextMatcher.Score(q, TextMatcher.Normalize(w.Title)), TextMatcher.Score(q, TextMatcher.Normalize(w.App?.Name)))))
             .Where(x => x.s > 0)
             .OrderByDescending(x => x.s)
-            .Take(8)
+            .ToList();
+        results.MoreWindows = Math.Max(0, windowMatches.Count - SearchResults.MaxListRows);
+        results.Windows.AddRange(windowMatches
+            .Take(SearchResults.MaxListRows)
             .Select(x => new SearchResult { Kind = SearchResultKind.Window, Title = x.w.DisplayTitle, Subtitle = x.w.App?.Name, Icon = x.w.Icon, Window = x.w, Score = x.s }));
 
         if (options.Settings)
@@ -137,16 +146,23 @@ public sealed class SearchService
                 if (s > 0) results.Settings.Add(new SearchResult { Kind = SearchResultKind.Setting, Title = fr ? p.Fr : p.En, Subtitle = UI.Loc.T("WindowsSettings"), Glyph = p.Glyph, Target = p.Uri, Score = s });
             }
             results.Settings.Sort((a, b) => b.Score.CompareTo(a.Score));
-            if (results.Settings.Count > 5) results.Settings.RemoveRange(5, results.Settings.Count - 5);
+            if (results.Settings.Count > SearchResults.MaxListRows)
+            {
+                results.MoreSettings = results.Settings.Count - SearchResults.MaxListRows;
+                results.Settings.RemoveRange(SearchResults.MaxListRows, results.MoreSettings);
+            }
         }
 
         if (options.Files && q.Length >= 2)
         {
-            results.Files.AddRange(_recent
+            var fileMatches = _recent
                 .Select(f => (f, s: TextMatcher.Score(q, f.Norm)))
                 .Where(x => x.s >= 600)
                 .OrderByDescending(x => x.s)
-                .Take(6)
+                .ToList();
+            results.MoreFiles = Math.Max(0, fileMatches.Count - SearchResults.MaxListRows);
+            results.Files.AddRange(fileMatches
+                .Take(SearchResults.MaxListRows)
                 .Select(x => new SearchResult { Kind = SearchResultKind.File, Title = x.f.Name, Subtitle = UI.Loc.T("RecentFiles"), Glyph = "", Target = x.f.Path, Score = x.s }));
         }
         return results;

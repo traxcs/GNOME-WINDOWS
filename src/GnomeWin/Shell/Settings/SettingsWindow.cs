@@ -59,7 +59,7 @@ public sealed class SettingsWindow : Window
         SetResourceReference(FontFamilyProperty, "Font.Ui");
         FontSize = 14;
         TextOptions.SetTextFormattingMode(this, TextFormattingMode.Display);
-        Icon = System.Windows.Media.Imaging.BitmapFrame.Create(new Uri("pack://application:,,,/GnomeWin;component/Assets/GnomeWin.ico"));
+        Icon = EmbeddedIcon.Window("Settings.ico");
         WindowChrome.SetWindowChrome(this, new WindowChrome
         {
             CaptionHeight = 46,
@@ -1078,6 +1078,10 @@ public sealed class SettingsWindow : Window
                 InfoRow(L("Mémoire", "Memory"), WindowsSettings.Memory()),
                 InfoRow(L("Capacité du disque", "Disk Capacity"), WindowsSettings.DiskCapacity()),
                 InfoRow("GnomeWin", version),
+                LinkRow(L("Inspiré de GNOME Shell", "Based on GNOME Shell"),
+                    L("Interface reproduite d'après le code du projet GNOME. GnomeWin n'est pas affilié au projet GNOME.",
+                      "Interface modelled on the GNOME project's own code. GnomeWin is not affiliated with the GNOME project."),
+                    () => ShellLauncher.Open("https://gitlab.gnome.org/GNOME/gnome-shell")),
                 InfoRow(L("Mémoire utilisée par GnomeWin", "Memory used by GnomeWin"), $"{Environment.WorkingSet / 1048576} Mo"),
                 LinkRow(L("Diagnostic", "Diagnostics"), L("Copier le rapport dans le presse-papiers", "Copy the report to the clipboard"), () => { try { Clipboard.SetText(_diagnostics()); } catch { } }, external: false)),
             Group(L("Maintenance", "Maintenance"), null,

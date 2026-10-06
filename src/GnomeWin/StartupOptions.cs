@@ -73,7 +73,7 @@ public sealed class StartupOptions
         Quit ? "quit" : Restore ? "quit" : OpenSettings ? (SettingsPanel != null ? "settings:" + SettingsPanel : "settings") : OpenApps ? "apps" : SearchText != null ? "search:" + SearchText : ActionName != null ? "action:" + ActionName : "overview";
 
     public const string HelpText = """
-        GnomeWin – GNOME Shell experience for Windows 11
+        GnomeWin – GNOME Shell experience for Windows
 
         Usage: GnomeWin.exe [option]
 

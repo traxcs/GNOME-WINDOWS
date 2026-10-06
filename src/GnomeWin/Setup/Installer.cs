@@ -62,9 +62,10 @@ public static class Installer
         progress(Text("Création des raccourcis…", "Creating shortcuts…"));
         ShortcutHelper.Create(Path.Combine(StartMenuDir, "GnomeWin.lnk"), InstalledExe, "", "GNOME Shell experience for Windows");
         ShortcutHelper.Create(Path.Combine(StartMenuDir, Text("GnomeWin (mode sans échec).lnk", "GnomeWin (safe mode).lnk")), InstalledExe, "--safe-mode", "GnomeWin safe mode");
-        ShortcutHelper.Create(Path.Combine(StartMenuDir, Text("Paramètres GnomeWin.lnk", "GnomeWin Settings.lnk")), InstalledExe, "--settings", "GnomeWin settings");
+        ShortcutHelper.Create(Path.Combine(StartMenuDir, Text("Paramètres GnomeWin.lnk", "GnomeWin Settings.lnk")), InstalledExe, "--settings", "GnomeWin settings",
+            null, null, ExtractIcon("Settings.ico"));
         ShortcutHelper.Create(Path.Combine(StartMenuDir, "Console.lnk"), InstalledExe, "--terminal", Text("Terminal (PowerShell et cmd)", "Terminal (PowerShell and cmd)"),
-            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), App.ConsoleAppId, ExtractConsoleIcon());
+            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), App.ConsoleAppId, ExtractIcon("Console.ico"));
         ShortcutHelper.Create(Path.Combine(StartMenuDir, Text("Restaurer la barre des tâches Windows.lnk", "Restore the Windows taskbar.lnk")), InstalledExe, "--restore", "Quit GnomeWin and restore the Windows taskbar");
         if (o.DesktopShortcut) ShortcutHelper.Create(DesktopShortcut, InstalledExe, "", "GNOME Shell experience for Windows");
 
@@ -142,12 +143,12 @@ public static class Installer
             Thread.Sleep(150);
     }
 
-    private static string ExtractConsoleIcon()
+    private static string ExtractIcon(string name)
     {
-        string path = Path.Combine(InstallDir, "Console.ico");
+        string path = Path.Combine(InstallDir, name);
         try
         {
-            using var src = typeof(Installer).Assembly.GetManifestResourceStream("Console.ico");
+            using var src = typeof(Installer).Assembly.GetManifestResourceStream(name);
             if (src == null) return InstalledExe;
             using var dst = File.Create(path);
             src.CopyTo(dst);
@@ -155,7 +156,7 @@ public static class Installer
         }
         catch (Exception ex)
         {
-            Log.Warn("Cannot write the Console icon", ex);
+            Log.Warn($"Cannot write the {name} icon", ex);
             return InstalledExe;
         }
     }

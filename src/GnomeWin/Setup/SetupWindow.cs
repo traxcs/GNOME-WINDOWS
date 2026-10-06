@@ -2,6 +2,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Interop;
 using System.Windows.Media;
+using System.Windows.Shell;
 using GnomeWin.Platform.Win32;
 using GnomeWin.Services.Logging;
 using GnomeWin.UI;
@@ -30,14 +31,22 @@ public sealed class SetupWindow : Window
         SetResourceReference(ForegroundProperty, "Brush.Fg");
         SetResourceReference(FontFamilyProperty, "Font.Ui");
         FontSize = 13.5;
-        Icon = System.Windows.Media.Imaging.BitmapFrame.Create(new Uri("pack://application:,,,/GnomeWin;component/Assets/GnomeWin.ico"));
+        Icon = EmbeddedIcon.Window("GnomeWin.ico");
+        WindowChrome.SetWindowChrome(this, new WindowChrome
+        {
+            CaptionHeight = 42,
+            ResizeBorderThickness = new Thickness(0),
+            GlassFrameThickness = new Thickness(0),
+            UseAeroCaptionButtons = false,
+            CornerRadius = new CornerRadius(12),
+        });
 
-        var root = new StackPanel { Margin = new Thickness(28) };
+        var root = new StackPanel { Margin = new Thickness(28, 6, 28, 28) };
         var header = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 18) };
-        header.Children.Add(new Image { Source = Icon, Width = 56, Height = 56, Margin = new Thickness(0, 0, 16, 0) });
+        header.Children.Add(new Image { Source = EmbeddedIcon.Load("GnomeWin.ico", 64), Width = 56, Height = 56, Margin = new Thickness(0, 0, 16, 0) });
         var titles = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
         titles.Children.Add(new TextBlock { Text = "GnomeWin " + Installer.Version, FontSize = 22, FontWeight = FontWeights.SemiBold });
-        titles.Children.Add(new TextBlock { Text = T("L'expérience GNOME Shell pour Windows 11", "The GNOME Shell experience for Windows 11"), Opacity = 0.7 });
+        titles.Children.Add(new TextBlock { Text = T("L'expérience GNOME Shell pour Windows", "The GNOME Shell experience for Windows"), Opacity = 0.7 });
         header.Children.Add(titles);
         root.Children.Add(header);
 
@@ -83,15 +92,52 @@ public sealed class SetupWindow : Window
         buttons.Children.Add(_cancel);
         buttons.Children.Add(_primary);
         root.Children.Add(buttons);
-        Content = root;
+
+        var page = new DockPanel { LastChildFill = true };
+        var titleBar = BuildTitleBar();
+        DockPanel.SetDock(titleBar, Dock.Top);
+        page.Children.Add(titleBar);
+        page.Children.Add(root);
+        Content = page;
 
         SourceInitialized += (_, _) =>
         {
             UI.Components.ShellWindow.UseSoftwareRendering(this);
+            var h = new WindowInteropHelper(this).Handle;
             int dark = UI.Themes.ThemeManager.IsDark ? 1 : 0;
-            NativeMethods.DwmSetWindowAttribute(new WindowInteropHelper(this).Handle, NativeMethods.DWMWA_USE_IMMERSIVE_DARK_MODE, ref dark, sizeof(int));
+            NativeMethods.DwmSetWindowAttribute(h, NativeMethods.DWMWA_USE_IMMERSIVE_DARK_MODE, ref dark, sizeof(int));
+            int round = NativeMethods.DWMWCP_ROUND;
+            NativeMethods.DwmSetWindowAttribute(h, NativeMethods.DWMWA_WINDOW_CORNER_PREFERENCE, ref round, sizeof(int));
         };
     }
+
+    private UIElement BuildTitleBar()
+    {
+        var bar = new Grid { Height = 42 };
+        bar.Children.Add(new TextBlock
+        {
+            Text = Title,
+            FontWeight = FontWeights.Bold,
+            FontSize = 13.5,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center,
+        });
+        var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 10, 0) };
+        buttons.Children.Add(WindowButton("", () => WindowState = WindowState.Minimized));
+        buttons.Children.Add(WindowButton("", Close));
+        bar.Children.Add(buttons);
+        return bar;
+    }
+
+    private static Button WindowButton(string glyph, Action click)
+    {
+        var b = new Button { Content = glyph, Width = 24, Height = 24, FontSize = 8, Margin = new Thickness(8, 0, 0, 0) };
+        b.SetResourceReference(StyleProperty, "RoundIconButton");
+        b.Click += (_, _) => click();
+        WindowChrome.SetIsHitTestVisibleInChrome(b, true);
+        return b;
+    }
+
 
     private static CheckBox Switch(string text, bool value)
     {
