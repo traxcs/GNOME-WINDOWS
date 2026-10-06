@@ -283,6 +283,9 @@ public sealed class ShellHost : IDisposable
                 case ShellAction.ToggleQuickSettings: ToggleQuickSettings(null); break;
                 case ShellAction.ToggleNotifications: ToggleCalendar(null); break;
                 case ShellAction.OpenShellSettings: OpenSettingsWindow(); break;
+                case ShellAction.OpenTerminal:
+                    ShellLauncher.Open(Environment.ProcessPath!, "--terminal");
+                    break;
                 case >= ShellAction.LaunchDockItem1 and <= ShellAction.LaunchDockItem9:
                     if (_overview.IsOpen) _overview.Close(null);
                     _dock.ActivateIndex(action - ShellAction.LaunchDockItem1);

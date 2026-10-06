@@ -125,6 +125,7 @@ appuyant simplement sur la combinaison.
 | **Super + Maj + Page↑ / Page↓** | Déplacer la fenêtre active vers l'espace précédent / suivant (et la suivre) |
 | **Ctrl + Alt + Maj + ↑ / ↓** | Idem |
 | **Super + 1…9** | Activer / lancer la n-ième application du dock |
+| **Ctrl + Alt + T** | Ouvrir la Console (terminal), comme sur Ubuntu |
 | **Ctrl + Alt + Maj + F12** | **Urgence** : quitte GnomeWin et restaure Windows (géré par le watchdog, fonctionne même si le shell est figé) |
 
 Dans la vue d'ensemble :
@@ -341,6 +342,25 @@ la session précédente s'est mal terminée, et à la désinstallation.
 
 ---
 
+## Console (terminal)
+
+**Console** est le terminal de GnomeWin, inspiré de GNOME Console : barre d'en-tête, onglets, prompt `utilisateur@machine:~/dossier$`, palette GNOME, thème clair/sombre suivant GnomeWin. Ouverture : **Ctrl+Alt+T**,
+l'icône « Console » (grille / menu Démarrer) ou `GnomeWin.exe --terminal`.
+
+- **Vrai terminal** : pseudo-console Windows (ConPTY) + émulateur VT/xterm (couleurs 16/256/24 bits, écran
+  alternatif, régions de défilement…) ; PSReadLine, ssh, git, programmes plein écran fonctionnent.
+- **PowerShell et cmd mélangés**, dans chaque onglet : c'est PowerShell (7 s'il est installé, sinon 5.1). Les lignes
+  en syntaxe cmd sont reconnues et exécutées par `cmd.exe` dans le même dossier : `dir /s /b`, `set X=1` (crée
+  une vraie variable d'environnement), `echo %PATH%`, `cd /d D:\`, `if exist …`, `for %i in …`, `a && b`,
+  `ver`, `mklink`, `assoc`… ; `where`, `sc` et `curl` appellent les vrais `.exe`. Tout le reste est du PowerShell.
+- **Raccourcis** : Ctrl+Maj+T nouvel onglet, Ctrl+Maj+W fermer, Ctrl+Maj+N nouvelle fenêtre, Ctrl+Page↑/↓ ou
+  Alt+1…9 changer d'onglet, Ctrl+C copie s'il y a une sélection (sinon interrompt), Ctrl+V / Ctrl+Maj+V coller,
+  Ctrl+ +/−/0 zoom, Maj+Page↑/↓ ou molette : historique (5000 lignes).
+- **Léger** : même exécutable, processus séparé (le shell n'est jamais affecté), seules les lignes modifiées sont
+  redessinées ; ~50 Mo pour la fenêtre (+ le processus PowerShell).
+
+---
+
 ## Ligne de commande
 
 ```
@@ -349,6 +369,8 @@ GnomeWin.exe --safe-mode        sans remplacement de barre des tâches ni hook c
 GnomeWin.exe --settings         ouvre les paramètres
 GnomeWin.exe --overview         ouvre la vue d'ensemble
 GnomeWin.exe --apps             ouvre la grille d'applications
+GnomeWin.exe --terminal [--working-directory <dossier>]
+                                ouvre la Console (commandes PowerShell et cmd dans le même shell)
 GnomeWin.exe --search <texte>   ouvre la vue d'ensemble et recherche <texte>
 GnomeWin.exe --quit             quitte le shell (la barre native est restaurée)
 GnomeWin.exe --restore          restaure la barre des tâches (et quitte le shell s'il tourne)

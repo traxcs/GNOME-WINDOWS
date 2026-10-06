@@ -275,7 +275,16 @@ public class SettingsTests
         Assert.Equal(DesignStyle.Gnome, s.General.Style);
         Assert.Equal(DockVisibility.AlwaysVisible, s.Dock.Visibility);
         Assert.Equal(DockPosition.Bottom, s.Dock.Position);
-        Assert.True(s.Overview.HotCorner);
+        Assert.False(s.Overview.HotCorner);
+    }
+
+    [Fact]
+    public void Hot_corner_is_turned_off_by_migration()
+    {
+        var doc = JsonNode.Parse("""{ "Version": 5, "Overview": { "HotCorner": true } }""")!.AsObject();
+        SettingsMigrator.CreateDefault().Migrate(doc, out _);
+        var s = doc.Deserialize<AppSettings>(SettingsService.JsonOptions)!;
+        Assert.False(s.Overview.HotCorner);
     }
 
     [Fact]

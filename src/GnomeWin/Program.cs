@@ -26,7 +26,7 @@ public static class Program
     [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
     private static int RunShellOrTool(StartupOptions options, string[] args)
     {
-        Log.Initialize(AppPaths.Logs, "gnomewin", options.Verbose);
+        Log.Initialize(AppPaths.Logs, options.Terminal ? "console" : "gnomewin", options.Verbose);
         Log.Info($"GnomeWin starting: {string.Join(' ', args)}");
 
         if (options.Help)
@@ -44,6 +44,12 @@ public static class Program
             return 0;
         }
         if (options.Diagnostics) return RunDiagnostics();
+        if (options.Terminal)
+        {
+            var console = new App(options);
+            console.InitializeComponent();
+            return console.Run();
+        }
         if (options.Uninstall && options.Quiet)
         {
             Setup.Installer.Uninstall(removeUserData: false);

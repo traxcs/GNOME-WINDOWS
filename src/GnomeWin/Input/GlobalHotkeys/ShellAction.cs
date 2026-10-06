@@ -15,6 +15,7 @@ public enum ShellAction
     OpenShellSettings,
     LaunchDockItem1, LaunchDockItem2, LaunchDockItem3, LaunchDockItem4, LaunchDockItem5,
     LaunchDockItem6, LaunchDockItem7, LaunchDockItem8, LaunchDockItem9,
+    OpenTerminal,
 
     SwitcherNext,
     SwitcherPrevious,

@@ -43,6 +43,11 @@ public partial class App : Application
             setup.Show();
             return;
         }
+        if (_options.Terminal)
+        {
+            StartConsole();
+            return;
+        }
         try
         {
             bool forceSafe = RecoveryService.OnStartup();
@@ -65,6 +70,37 @@ public partial class App : Application
                 "GnomeWin", MessageBoxButton.OK, MessageBoxImage.Error);
             Shutdown(1);
         }
+    }
+
+    [System.Runtime.InteropServices.DllImport("shell32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode)]
+    private static extern int SetCurrentProcessExplicitAppUserModelID(string appId);
+
+    public const string ConsoleAppId = "GnomeWin.Console";
+
+    private void StartConsole()
+    {
+        SetCurrentProcessExplicitAppUserModelID(ConsoleAppId);
+        var s = new AppSettings();
+        try
+        {
+            if (File.Exists(AppPaths.SettingsFile))
+                s = System.Text.Json.JsonSerializer.Deserialize<AppSettings>(File.ReadAllText(AppPaths.SettingsFile), SettingsService.JsonOptions) ?? s;
+        }
+        catch (Exception ex) { Log.Warn("Console: cannot read settings", ex); }
+        GnomeWin.UI.Components.ShellWindow.SoftwareRenderingEnabled = s.General.LowMemoryMode;
+        if (s.General.LowMemoryMode)
+            System.Windows.Media.RenderOptions.ProcessRenderMode = System.Windows.Interop.RenderMode.SoftwareOnly;
+        UI.Loc.Apply(s.General.Language);
+        UI.Themes.ThemeManager.Apply(s.General.Style, s.General.Theme, s.General.Accent);
+        ShutdownMode = ShutdownMode.OnLastWindowClose;
+        var window = new Terminal.ConsoleWindow(_options.TerminalDirectory);
+        MainWindow = window;
+        window.Show();
+        Microsoft.Win32.SystemEvents.UserPreferenceChanged += (_, e) =>
+        {
+            if (e.Category == Microsoft.Win32.UserPreferenceCategory.General && s.General.Theme == ThemeMode.System)
+                Dispatcher.BeginInvoke(() => UI.Themes.ThemeManager.Apply(s.General.Style, s.General.Theme, s.General.Accent));
+        };
     }
 
     protected override void OnExit(ExitEventArgs e)

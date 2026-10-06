@@ -968,6 +968,7 @@ public sealed class SettingsWindow : Window
             (nameof(ShellAction.ToggleNotifications), "Afficher la liste des notifications", "Show the notification list", true),
             (nameof(ShellAction.ToggleQuickSettings), "Ouvrir le menu système", "Open the quick settings menu", true),
             (nameof(ShellAction.OpenShellSettings), "Ouvrir les paramètres", "Open settings", true),
+            (nameof(ShellAction.OpenTerminal), "Lancer le terminal", "Launch terminal", true),
             (nameof(ShellAction.AppSwitcher), "Changer d'application", "Switch applications", false),
             (nameof(ShellAction.WorkspacePrevious), "Aller à l'espace de travail précédent", "Switch to workspace on the left", false),
             (nameof(ShellAction.WorkspaceNext), "Aller à l'espace de travail suivant", "Switch to workspace on the right", false),

@@ -17,7 +17,7 @@ public enum DesignStyle { Gnome, Ubuntu, PopOS }
 
 public sealed class AppSettings
 {
-    public const int CurrentVersion = 5;
+    public const int CurrentVersion = 6;
 
     public int Version { get; set; } = CurrentVersion;
     public GeneralSettings General { get; set; } = new();
@@ -106,7 +106,7 @@ public sealed class OverviewSettings : ObservableObject
     private bool _searchCalculator = true;
     private bool _livePreviews = true;
     private bool _showWorkspaceStrip = true;
-    private bool _hotCorner = true;
+    private bool _hotCorner;
 
     public OverviewLayout Layout { get => _layout; set => Set(ref _layout, value); }
     public OverviewBackground Background { get => _background; set => Set(ref _background, value); }
@@ -177,6 +177,7 @@ public sealed class KeyboardSettings : ObservableObject
             [nameof(ShellAction.ToggleQuickSettings)] = new(),
             [nameof(ShellAction.ToggleNotifications)] = new(),
             [nameof(ShellAction.OpenShellSettings)] = new(),
+            [nameof(ShellAction.OpenTerminal)] = new() { "Ctrl+Alt+T" },
         };
         for (int i = 1; i <= 9; i++)
             d["LaunchDockItem" + i] = new() { "Super+" + i };

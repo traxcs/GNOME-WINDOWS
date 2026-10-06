@@ -50,6 +50,12 @@ public sealed class SettingsMigrator
             foreach (var p in current.Skip(oldDefaults.Count)) kept.Add(p);
             dock["PinnedApps"] = kept;
         });
+        m.Register(5, root =>
+        {
+            var overview = root["Overview"] as JsonObject ?? new JsonObject();
+            root["Overview"] = overview;
+            overview["HotCorner"] = false;
+        });
         return m;
     }
 

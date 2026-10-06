@@ -21,6 +21,8 @@ public sealed class StartupOptions
     public bool Quiet { get; set; }
     public bool Startup { get; set; }
     public string? SettingsPanel { get; set; }
+    public bool Terminal { get; set; }
+    public string? TerminalDirectory { get; set; }
 
     public static StartupOptions Parse(string[] args)
     {
@@ -47,6 +49,10 @@ public sealed class StartupOptions
                 case "-uninstall": o.Uninstall = true; break;
                 case "-quiet": case "-silent": o.Quiet = true; break;
                 case "-startup": o.Startup = true; break;
+                case "-terminal": case "-console": o.Terminal = true; break;
+                case "-working-directory": case "-wd":
+                    if (i + 1 < args.Length) { o.TerminalDirectory = args[i + 1]; i++; }
+                    break;
                 case "-action":
                     if (i + 1 < args.Length) { o.ActionName = args[i + 1]; i++; }
                     break;
@@ -77,6 +83,8 @@ public sealed class StartupOptions
                              multitasking, appearance, dock, apps, notifications, search, mouse, keyboard, accessibility, system)
           --overview         open the Overview
           --apps             open the application grid
+          --terminal [--working-directory <dir>]
+                             open Console, the GNOME-style terminal (PowerShell and cmd commands in one shell)
           --search <text>    open the Overview and search for <text>
           --action <name>    run a shell action (ToggleOverview, ToggleQuickSettings, ToggleNotifications,
                              WorkspaceNext, WorkspacePrevious, AppSwitcher, LaunchDockItem1…)

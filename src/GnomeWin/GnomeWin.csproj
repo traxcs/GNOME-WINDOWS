@@ -42,6 +42,8 @@
 
   <ItemGroup>
     <Resource Include="Assets\GnomeWin.ico" />
+    <Resource Include="Assets\Console.ico" />
+    <EmbeddedResource Include="Assets\Console.ico" LogicalName="Console.ico" />
     <Resource Include="Assets\Fonts\*.ttf" />
     <None Include="Assets\Fonts\*.txt" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
