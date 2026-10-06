@@ -7,7 +7,7 @@ namespace GnomeWin.Shell.Dock;
 
 public sealed class DockItemViewModel : ObservableObject
 {
-    private bool _isPinned, _isActive, _isLaunching, _isSelected, _isDropTarget;
+    private bool _isPinned, _isActive, _isLaunching, _isSelected, _isDropTarget, _separatorBefore;
     private int _windowCount;
     private AppEntry? _app;
 
@@ -49,6 +49,7 @@ public sealed class DockItemViewModel : ObservableObject
     public bool IsLaunching { get => _isLaunching; set => Set(ref _isLaunching, value); }
     public bool IsSelected { get => _isSelected; set => Set(ref _isSelected, value); }
     public bool IsDropTarget { get => _isDropTarget; set => Set(ref _isDropTarget, value); }
+    public bool SeparatorBefore { get => _separatorBefore; set => Set(ref _separatorBefore, value); }
 
     public int WindowCount
     {

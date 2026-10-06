@@ -79,7 +79,7 @@ public sealed class DockWindow : ShellWindow
             _ => new RECT(m.Left, m.Bottom - t, m.Right, m.Bottom),
         };
         bool vertical = s.Position != DockPosition.Bottom;
-        View.ConfigureShape(s.Position, s.Extended);
+        View.ConfigureShape(s.Position, s.Extended, s.CenterIcons);
 
         if (s.Extended)
         {

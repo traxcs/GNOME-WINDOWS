@@ -20,6 +20,7 @@ public sealed class StartupOptions
     public bool Uninstall { get; set; }
     public bool Quiet { get; set; }
     public bool Startup { get; set; }
+    public string? SettingsPanel { get; set; }
 
     public static StartupOptions Parse(string[] args)
     {
@@ -30,7 +31,10 @@ public sealed class StartupOptions
             {
                 case "-safe-mode": case "-safemode": case "safe-mode": o.SafeMode = true; break;
                 case "-autostart": o.AutoStart = true; break;
-                case "-settings": o.OpenSettings = true; break;
+                case "-settings":
+                    o.OpenSettings = true;
+                    if (i + 1 < args.Length && !args[i + 1].StartsWith("-")) { o.SettingsPanel = args[i + 1]; i++; }
+                    break;
                 case "-overview": o.OpenOverview = true; break;
                 case "-apps": o.OpenApps = true; break;
                 case "-quit": case "-exit": o.Quit = true; break;
@@ -60,7 +64,7 @@ public sealed class StartupOptions
     }
 
     public string ForwardedCommand =>
-        Quit ? "quit" : Restore ? "quit" : OpenSettings ? "settings" : OpenApps ? "apps" : SearchText != null ? "search:" + SearchText : ActionName != null ? "action:" + ActionName : "overview";
+        Quit ? "quit" : Restore ? "quit" : OpenSettings ? (SettingsPanel != null ? "settings:" + SettingsPanel : "settings") : OpenApps ? "apps" : SearchText != null ? "search:" + SearchText : ActionName != null ? "action:" + ActionName : "overview";
 
     public const string HelpText = """
         GnomeWin – GNOME Shell experience for Windows 11
@@ -69,7 +73,8 @@ public sealed class StartupOptions
 
           (no option)        start the shell (or open the Overview if it is already running)
           --safe-mode        start without taskbar replacement and without global keyboard hook
-          --settings         open the settings window
+          --settings [panel] open the settings window (panels: wifi, network, bluetooth, displays, sound, power,
+                             multitasking, appearance, dock, apps, notifications, search, mouse, keyboard, accessibility, system)
           --overview         open the Overview
           --apps             open the application grid
           --search <text>    open the Overview and search for <text>

@@ -36,6 +36,57 @@ public sealed class WallpaperProvider
 
     public void Invalidate() => _cache.Clear();
 
+    public static bool SetWindowsWallpaper(string path)
+    {
+        try
+        {
+            var dw = (IDesktopWallpaper)new DesktopWallpaperCom();
+            try { return dw.SetWallpaper(null, path) == 0; }
+            finally { Marshal.ReleaseComObject(dw); }
+        }
+        catch (Exception ex)
+        {
+            Log.Warn("Setting the wallpaper failed", ex);
+            return false;
+        }
+    }
+
+    public static string? CurrentWallpaperPath()
+    {
+        var sb = new StringBuilder(520);
+        return NativeMethods.SystemParametersInfo(NativeMethods.SPI_GETDESKWALLPAPER, (uint)sb.Capacity, sb, 0) && File.Exists(sb.ToString()) ? sb.ToString() : null;
+    }
+
+    public static IReadOnlyList<string> BuiltInWallpapers()
+    {
+        string dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "Web", "Wallpaper");
+        try
+        {
+            return Directory.Exists(dir)
+                ? Directory.EnumerateFiles(dir, "*.*", SearchOption.AllDirectories)
+                    .Where(f => f.EndsWith(".jpg", StringComparison.OrdinalIgnoreCase) || f.EndsWith(".png", StringComparison.OrdinalIgnoreCase))
+                    .Take(24).ToList()
+                : Array.Empty<string>();
+        }
+        catch { return Array.Empty<string>(); }
+    }
+
+    public static ImageSource? Thumbnail(string path, int width = 200)
+    {
+        try
+        {
+            var bmp = new BitmapImage();
+            bmp.BeginInit();
+            bmp.CacheOption = BitmapCacheOption.OnLoad;
+            bmp.UriSource = new Uri(path);
+            bmp.DecodePixelWidth = width;
+            bmp.EndInit();
+            bmp.Freeze();
+            return bmp;
+        }
+        catch { return null; }
+    }
+
     public WallpaperImages Get(MonitorInfo monitor)
     {
         if (_cache.TryGetValue(monitor.Key, out var cached)) return cached;

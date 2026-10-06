@@ -305,12 +305,27 @@ public sealed class ShellHost : IDisposable
 
     private DateTime _lastHotCorner;
 
-    private void OnHotCorner()
+    private DispatcherTimer? _hotCornerDwell;
+
+    private void OnHotCorner(MonitorInfo monitor)
     {
         if (!_settings.Current.Overview.HotCorner || (DateTime.Now - _lastHotCorner).TotalMilliseconds < 600) return;
         if (_fullscreen.AnyFullscreen) return;
-        _lastHotCorner = DateTime.Now;
-        _overview.Toggle();
+        _hotCornerDwell?.Stop();
+        int checks = 0;
+        _hotCornerDwell = new DispatcherTimer(DispatcherPriority.Input) { Interval = TimeSpan.FromMilliseconds(40) };
+        _hotCornerDwell.Tick += (_, _) =>
+        {
+            GetCursorPos(out var p);
+            bool inCorner = p.X <= monitor.Bounds.Left + 1 && p.Y <= monitor.Bounds.Top + 1;
+            bool buttons = (GetAsyncKeyState(0x01) & 0x8000) != 0 || (GetAsyncKeyState(0x02) & 0x8000) != 0;
+            if (!inCorner || buttons) { _hotCornerDwell!.Stop(); return; }
+            if (++checks < 4) return;
+            _hotCornerDwell!.Stop();
+            _lastHotCorner = DateTime.Now;
+            _overview.Toggle();
+        };
+        _hotCornerDwell.Start();
     }
 
     private void TrimSoon()
@@ -364,7 +379,7 @@ public sealed class ShellHost : IDisposable
                 bar = new TopBarWindow(mon);
                 var b = bar;
                 bar.View.Activities.Click += (_, _) => _overview.Toggle();
-                bar.View.HotCorner.MouseEnter += (_, _) => OnHotCorner();
+                bar.View.HotCorner.MouseEnter += (_, _) => OnHotCorner(b.Monitor);
                 bar.View.Clock.Click += (_, _) => ToggleCalendar(b);
                 bar.View.Status.Click += (_, _) => ToggleQuickSettings(b);
                 bar.FullscreenAppChanged += (tb, fs) => _fullscreen.Hint(tb.Monitor.Handle, fs);
@@ -385,7 +400,7 @@ public sealed class ShellHost : IDisposable
         foreach (var bar in _topBars.Values)
         {
             bar.View.SetWorkspaces(count, current);
-            if (_status != null) bar.View.SetStatus(_status);
+            if (_status != null) bar.View.SetStatus(_status, _settings.Current.General.ShowBatteryIcon, _settings.Current.General.ShowBatteryPercentage);
             bar.View.SetHasNotifications(anyNotif);
             bar.View.SetClock(DateTime.Now);
         }
@@ -412,7 +427,7 @@ public sealed class ShellHost : IDisposable
         bar ??= PrimaryTopBar();
         var mon = bar?.Monitor ?? _monitors.Primary;
         _quickSettings = new QuickSettingsWindow(_status, OpenSettingsWindow, (msg, ok) => ConfirmDialog.Ask(msg, ok, mon));
-        _quickSettings.Closed += (_, _) => { _quickSettings = null; TrimSoon(); };
+        _quickSettings.Closed += (_, _) => { _quickSettings = null; SetPanelActive(v => v.Status, false); TrimSoon(); };
         int right = mon.Bounds.Right - (int)(8 * mon.Scale);
         int top = mon.Bounds.Top + (bar?.PhysicalHeight ?? 0);
         if (bar != null)
@@ -421,6 +436,7 @@ public sealed class ShellHost : IDisposable
             right = (int)p.X;
         }
         _quickSettings.ShowAnchored(right, top, PopupAnchor.Right, mon);
+        SetPanelActive(v => v.Status, true);
     }
 
     private void ToggleCalendar(TopBarWindow? bar)
@@ -430,9 +446,10 @@ public sealed class ShellHost : IDisposable
         var mon = bar?.Monitor ?? _monitors.Primary;
         if (!_notifications.Initialized) _ = _notifications.InitializeAsync();
         _calendar = new CalendarWindow(_notifications, aumid => ShellLauncher.Open(@"shell:AppsFolder\" + aumid));
-        _calendar.Closed += (_, _) => { _calendar = null; TrimSoon(); };
+        _calendar.Closed += (_, _) => { _calendar = null; SetPanelActive(v => v.Clock, false); TrimSoon(); };
         int center = mon.Bounds.Left + mon.Bounds.Width / 2;
         _calendar.ShowAnchored(center, mon.Bounds.Top + (bar?.PhysicalHeight ?? 0), PopupAnchor.Center, mon);
+        SetPanelActive(v => v.Clock, true);
     }
 
     public void OpenSettingsWindow()
@@ -448,10 +465,17 @@ public sealed class ShellHost : IDisposable
         _settingsWindow.Closed += (_, _) => { _settingsWindow = null; TrimSoon(); };
         _settingsWindow.Show();
         _settingsWindow.Activate();
+        WindowActions.Activate(new System.Windows.Interop.WindowInteropHelper(_settingsWindow).Handle);
+    }
+
+    private void SetPanelActive(Func<TopBarView, System.Windows.Controls.Button> button, bool active)
+    {
+        foreach (var bar in _topBars.Values) TopBarView.SetActive(button(bar.View), active);
     }
 
     private void OnOverviewOpenChanged(bool open)
     {
+        SetPanelActive(v => v.Activities, open);
         if (!open) return;
         _quickSettings?.CloseAnimated();
         _calendar?.CloseAnimated();
@@ -584,6 +608,7 @@ public sealed class ShellHost : IDisposable
                     if (property is nameof(GeneralSettings.ReplaceTaskbar) or "*") { if (!_safeMode) EnableTaskbarReplacement(g.ReplaceTaskbar); UpdateTopBars(); }
                     if (property is nameof(GeneralSettings.ShowTopBar) or "*") { SyncTopBars(); if (!_safeMode) _dock.SyncWindows(); UpdateLocationTracking(); }
                     if (property is nameof(GeneralSettings.Language) or "*") Loc.Apply(g.Language);
+                    if (property is nameof(GeneralSettings.ShowBatteryIcon) or nameof(GeneralSettings.ShowBatteryPercentage)) UpdateTopBars();
                     if (property is nameof(GeneralSettings.VerboseLogging)) Log.MinimumLevel = g.VerboseLogging ? LogLevel.Debug : LogLevel.Info;
                     break;
                 case KeyboardSettings:
@@ -614,6 +639,12 @@ public sealed class ShellHost : IDisposable
         {
             if (Enum.TryParse(command["action:".Length..], true, out ShellAction action)) HandleAction(action);
             else Log.Warn($"Unknown action '{command}'");
+            return;
+        }
+        if (command.StartsWith("settings:", StringComparison.OrdinalIgnoreCase))
+        {
+            OpenSettingsWindow();
+            _settingsWindow?.ShowPanel(command["settings:".Length..].Trim().ToLowerInvariant());
             return;
         }
         if (command.StartsWith("search:", StringComparison.OrdinalIgnoreCase))

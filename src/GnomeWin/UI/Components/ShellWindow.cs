@@ -36,6 +36,8 @@ public class ShellWindow : Window
 
     protected bool PreferSoftwareRendering { get; set; } = true;
 
+    public static bool SoftwareRenderingEnabled { get; set; } = true;
+
     public static void UseSoftwareRendering(Window w)
     {
         var src = HwndSource.FromHwnd(new WindowInteropHelper(w).Handle);
@@ -55,7 +57,7 @@ public class ShellWindow : Window
         ex &= ~WS_EX_APPWINDOW;
         if (_noActivate) ex |= WS_EX_NOACTIVATE;
         SetWindowLongPtr(Handle, GWL_EXSTYLE, new IntPtr(ex));
-        if (PreferSoftwareRendering) UseSoftwareRendering(this);
+        if (PreferSoftwareRendering && SoftwareRenderingEnabled) UseSoftwareRendering(this);
         HwndSource.FromHwnd(Handle)?.AddHook(WndProc);
         ApplyPlacement();
     }

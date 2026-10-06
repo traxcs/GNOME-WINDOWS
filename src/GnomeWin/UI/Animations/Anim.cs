@@ -87,6 +87,8 @@ public sealed class FrameAnimation
     public static int Running { get; private set; }
 
     public double Value { get; private set; }
+    public int Frames { get; private set; }
+    public double ElapsedMs => _clock.Elapsed.TotalMilliseconds;
     public bool IsRunning => _running;
 
     public void Start(double from, double to, int durationMs, Action? completed = null)
@@ -96,6 +98,7 @@ public sealed class FrameAnimation
         _durationMs = Anim.Ms(durationMs);
         _onCompleted = completed;
         _clock.Restart();
+        Frames = 0;
         if (_durationMs <= 0 || Math.Abs(to - from) < 0.0001)
         {
             Stop();
@@ -124,6 +127,7 @@ public sealed class FrameAnimation
 
     private void OnRendering(object? sender, EventArgs e)
     {
+        Frames++;
         double t = Math.Clamp(_clock.Elapsed.TotalMilliseconds / _durationMs, 0, 1);
         Value = _from + (_to - _from) * t;
         _onFrame(Value);

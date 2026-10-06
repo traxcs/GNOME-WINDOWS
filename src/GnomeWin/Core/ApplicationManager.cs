@@ -60,7 +60,59 @@ public sealed class ApplicationManager
         }
         _transient.Clear();
         _windows.ReResolveApps();
+        if (!_settings.Current.Dock.TaskbarPinsImported && _catalog.Count > 0) ImportTaskbarPins();
         CatalogChanged?.Invoke();
+    }
+
+    private void ImportTaskbarPins()
+    {
+        var dock = _settings.Current.Dock;
+        dock.TaskbarPinsImported = true;
+        if (dock.PinnedApps.Count > 0) { _settings.Save(); return; }
+
+        string folder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+            @"Microsoft\Internet Explorer\Quick Launch\User Pinned\TaskBar");
+        var pins = new List<string>();
+        try
+        {
+            if (Directory.Exists(folder))
+            {
+                foreach (var lnk in new DirectoryInfo(folder).GetFiles("*.lnk").OrderBy(f => f.CreationTimeUtc))
+                {
+                    var app = ResolveShortcut(lnk.FullName);
+                    if (app != null && !pins.Contains(app.Id, StringComparer.OrdinalIgnoreCase)) pins.Add(app.Id);
+                }
+            }
+        }
+        catch (Exception ex) { Log.Warn("Taskbar pin import failed", ex); }
+
+        if (pins.Count > 0) dock.PinnedApps = pins;
+        Log.Info($"Imported {pins.Count} taskbar pin(s) into the dock.");
+        _settings.Save();
+    }
+
+    private AppEntry? ResolveShortcut(string lnkPath)
+    {
+        object? link = null;
+        try
+        {
+            link = new CShellLink();
+            ((System.Runtime.InteropServices.ComTypes.IPersistFile)link).Load(lnkPath, 0);
+            string? aumid = link is IPropertyStore ps ? ShellApi.GetStringProperty(ps, ShellApi.PKEY_AppUserModel_ID) : null;
+            if (!string.IsNullOrEmpty(aumid) && _byId.TryGetValue(aumid, out var byAumid)) return byAumid;
+
+            var sb = new System.Text.StringBuilder(1024);
+            ((IShellLinkW)link).GetPath(sb, sb.Capacity, IntPtr.Zero, 0);
+            string target = sb.ToString();
+            if (target.Length == 0 || string.Equals(Path.GetFileName(target), "explorer.exe", StringComparison.OrdinalIgnoreCase))
+                return Path.GetFileNameWithoutExtension(lnkPath) is "File Explorer" or "Explorateur de fichiers" || target.Length > 0
+                    ? FindById("Microsoft.Windows.Explorer") : null;
+            if (_byExe.TryGetValue(target, out var byExe)) return byExe;
+            if (_byExeName.TryGetValue(Path.GetFileName(target), out var named) && named.Count == 1) return named[0];
+            return File.Exists(target) ? FindById(target) : null;
+        }
+        catch (Exception ex) { Log.Debug($"Cannot read pin {lnkPath}: {ex.Message}"); return null; }
+        finally { if (link != null) System.Runtime.InteropServices.Marshal.ReleaseComObject(link); }
     }
 
     private static readonly Dictionary<string, string> KnownExecutables = new(StringComparer.OrdinalIgnoreCase)

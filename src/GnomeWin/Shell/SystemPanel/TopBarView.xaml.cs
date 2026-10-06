@@ -27,6 +27,12 @@ public partial class TopBarView : UserControl
         string day = now.ToString("ddd d MMM", Loc.Culture);
         ClockText.Text = $"{day}  {now:HH:mm}";
     }
+    
+    public static void SetActive(Button button, bool active)
+    {
+        if (active) button.SetResourceReference(BackgroundProperty, "Brush.PanelActive");
+        else button.Background = System.Windows.Media.Brushes.Transparent;
+    }
 
     public void SetHasNotifications(bool any) => NotificationDot.Visibility = any ? Visibility.Visible : Visibility.Collapsed;
 
@@ -49,15 +55,16 @@ public partial class TopBarView : UserControl
         }
     }
 
-    public void SetStatus(SystemStatusService s)
+    public void SetStatus(SystemStatusService s, bool showBattery, bool showPercentage)
     {
         NetworkGlyph.Text = StatusGlyphs.Network(s.Network, s.SignalBars);
         NetworkGlyph.Opacity = s.Network == NetworkKind.None ? 0.45 : 1;
         VolumeGlyph.Text = StatusGlyphs.Volume(s.Volume, s.Muted);
         VolumeGlyph.Visibility = s.AudioAvailable ? Visibility.Visible : Visibility.Collapsed;
-        if (s.HasBattery)
+        if (s.HasBattery && showBattery)
         {
-            BatteryGlyph.Visibility = BatteryText.Visibility = Visibility.Visible;
+            BatteryGlyph.Visibility = Visibility.Visible;
+            BatteryText.Visibility = showPercentage ? Visibility.Visible : Visibility.Collapsed;
             BatteryGlyph.Text = StatusGlyphs.Battery(s.BatteryPercent, s.Charging);
             BatteryText.Text = s.BatteryPercent + " %";
         }

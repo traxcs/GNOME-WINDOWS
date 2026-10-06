@@ -118,14 +118,13 @@ public static class StylePresets
                 d.IconSize = 40; d.HoverEffect = DockHoverEffect.Highlight; d.BackgroundOpacity = 0.85;
                 break;
             case DesignStyle.PopOS:
-                d.Position = DockPosition.Bottom; d.Extended = false; d.Visibility = DockVisibility.Intellihide;
+                d.Position = DockPosition.Bottom; d.Extended = false; d.Visibility = DockVisibility.AlwaysVisible;
                 d.IconSize = 40; d.HoverEffect = DockHoverEffect.Highlight; d.BackgroundOpacity = 0.9;
                 break;
             default:
-                d.Position = DockPosition.Bottom; d.Extended = false; d.Visibility = DockVisibility.OverviewOnly;
+                d.Position = DockPosition.Bottom; d.Extended = false; d.Visibility = DockVisibility.AlwaysVisible;
                 d.IconSize = 40; d.HoverEffect = DockHoverEffect.Highlight; d.BackgroundOpacity = 0.8;
                 break;
-        }
-        s.General.Accent = AccentColor.Default;
+        }        s.General.Accent = AccentColor.Default;
     }
 }

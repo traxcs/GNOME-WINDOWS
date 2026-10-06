@@ -11,12 +11,14 @@ public sealed unsafe class InternalComBackend : IVirtualDesktopBackend
     private static readonly Guid CLSID_VirtualDesktopManagerInternal = new("C5E0CDCA-7B6E-41B2-9FC4-D93975CC467B");
     private static readonly Guid IID_IApplicationViewCollection = new("1841C6D7-4F9D-42C0-AF41-8747538F10E5");
     private static readonly Guid IID_IObjectArray = new("92CA9DCD-5622-4BBA-A805-5E9F541BD8C9");
-    private static readonly Guid IID_IVirtualDesktop = new("3F07F4BE-B107-441A-AF0F-39D82529072C");
 
-    private static readonly (string Build, Guid Iid)[] ManagerInternalIids =
+    private sealed record Layout(string Name, Guid ManagerIid, Guid DesktopIid, int Create, int Remove, int MoveDesktop);
+
+    private static readonly Layout[] Layouts =
     {
-        ("24H2 (26100)", new Guid("53F5CA0B-158F-4124-900C-057158060B27")),
-        ("23H2 (22631)", new Guid("A3175F2D-239C-4BD2-8AA0-EEBA8B0B138E")),
+        new("Windows 11 24H2", new("53F5CA0B-158F-4124-900C-057158060B27"), new("3F07F4BE-B107-441A-AF0F-39D82529072C"), Create: 11, Remove: 13, MoveDesktop: 12),
+        new("Windows 11 23H2", new("A3175F2D-239C-4BD2-8AA0-EEBA8B0B138E"), new("3F07F4BE-B107-441A-AF0F-39D82529072C"), Create: 11, Remove: 13, MoveDesktop: 12),
+        new("Windows 10", new("F31574D6-B682-4CDC-BD56-1827860ABEC6"), new("FF72FFDD-BE7E-43FC-9C03-AD81681E88E4"), Create: 10, Remove: 11, MoveDesktop: -1),
     };
 
     private const int Slot_GetCount = 3;
@@ -24,9 +26,6 @@ public sealed unsafe class InternalComBackend : IVirtualDesktopBackend
     private const int Slot_GetCurrentDesktop = 6;
     private const int Slot_GetDesktops = 7;
     private const int Slot_SwitchDesktop = 9;
-    private const int Slot_CreateDesktop = 11;
-    private const int Slot_MoveDesktop = 12;
-    private const int Slot_RemoveDesktop = 13;
     private const int Slot_Desktop_GetId = 4;
     private const int Slot_Array_GetCount = 3;
     private const int Slot_Array_GetAt = 4;
@@ -35,13 +34,14 @@ public sealed unsafe class InternalComBackend : IVirtualDesktopBackend
     private IntPtr _serviceProvider;
     private IntPtr _manager;
     private IntPtr _views;
+    private Layout _layout = Layouts[0];
 
     public string Name { get; private set; } = "Internal COM";
     public bool SupportsDirectSwitch => true;
     public bool SupportsCreate => true;
     public bool SupportsRemoveAny => true;
     public bool SupportsMoveWindow => _views != IntPtr.Zero;
-    public bool SupportsReorder => true;
+    public bool SupportsReorder => _layout.MoveDesktop >= 0;
 
     private InternalComBackend() { }
 
@@ -54,11 +54,12 @@ public sealed unsafe class InternalComBackend : IVirtualDesktopBackend
             int hr = CoCreateInstance(ref clsid, IntPtr.Zero, CLSCTX_LOCAL_SERVER, ref iid, out b._serviceProvider);
             if (hr != 0) { reason = $"ImmersiveShell unavailable (0x{hr:X8})"; b.Dispose(); return null; }
 
-            foreach (var (build, candidate) in ManagerInternalIids)
+            foreach (var layout in Layouts)
             {
-                if (QueryService(b._serviceProvider, CLSID_VirtualDesktopManagerInternal, candidate, out b._manager) == 0 && b._manager != IntPtr.Zero)
+                if (QueryService(b._serviceProvider, CLSID_VirtualDesktopManagerInternal, layout.ManagerIid, out b._manager) == 0 && b._manager != IntPtr.Zero)
                 {
-                    b.Name = $"Internal COM, Windows 11 {build} layout";
+                    b._layout = layout;
+                    b.Name = $"Internal COM, {layout.Name} layout";
                     break;
                 }
             }
@@ -138,7 +139,7 @@ public sealed unsafe class InternalComBackend : IVirtualDesktopBackend
             var getAt = (delegate* unmanaged[Stdcall]<IntPtr, uint, Guid*, IntPtr*, int>)Fn(array, Slot_Array_GetAt);
             uint n;
             Check(getCount(array, &n), "IObjectArray.GetCount");
-            Guid iid = IID_IVirtualDesktop;
+            Guid iid = _layout.DesktopIid;
             for (uint i = 0; i < n; i++)
             {
                 IntPtr d;
@@ -194,7 +195,7 @@ public sealed unsafe class InternalComBackend : IVirtualDesktopBackend
     public Guid? Create()
     {
         EnsureAlive();
-        var f = (delegate* unmanaged[Stdcall]<IntPtr, IntPtr*, int>)Fn(_manager, Slot_CreateDesktop);
+        var f = (delegate* unmanaged[Stdcall]<IntPtr, IntPtr*, int>)Fn(_manager, _layout.Create);
         IntPtr d;
         Check(f(_manager, &d), "CreateDesktop");
         try { return DesktopId(d); }
@@ -215,7 +216,7 @@ public sealed unsafe class InternalComBackend : IVirtualDesktopBackend
                 else if (g == fallback) fb = d;
             }
             if (target == IntPtr.Zero || fb == IntPtr.Zero) return false;
-            var f = (delegate* unmanaged[Stdcall]<IntPtr, IntPtr, IntPtr, int>)Fn(_manager, Slot_RemoveDesktop);
+            var f = (delegate* unmanaged[Stdcall]<IntPtr, IntPtr, IntPtr, int>)Fn(_manager, _layout.Remove);
             Check(f(_manager, target, fb), "RemoveDesktop");
             return true;
         }
@@ -246,9 +247,9 @@ public sealed unsafe class InternalComBackend : IVirtualDesktopBackend
         finally { Marshal.Release(viewPtr); }
     }
 
-    public bool MoveDesktop(Guid id, int index) => WithDesktop(id, d =>
+    public bool MoveDesktop(Guid id, int index) => SupportsReorder && WithDesktop(id, d =>
     {
-        var f = (delegate* unmanaged[Stdcall]<IntPtr, IntPtr, int, int>)Fn(_manager, Slot_MoveDesktop);
+        var f = (delegate* unmanaged[Stdcall]<IntPtr, IntPtr, int, int>)Fn(_manager, _layout.MoveDesktop);
         Check(f(_manager, d, index), "MoveDesktop");
         return true;
     }, false);

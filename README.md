@@ -1,7 +1,7 @@
-# GnomeWin — l'expérience GNOME Shell / Ubuntu sur Windows 11
+# GnomeWin — l'expérience GNOME Shell / Ubuntu sur Windows 10 et 11
 
 GnomeWin est un shell de bureau **indépendant, réversible et sans modification système** qui reproduit
-l'expérience GNOME Shell sur Windows 11 :
+l'expérience GNOME Shell sur Windows 10 (2004 / build 19041 et plus) et Windows 11 :
 
 - **Vue d'ensemble (Activités)** déclenchée par la touche **Super** : les fenêtres glissent de leur position
   réelle vers une grille, avec de **vrais aperçus en direct** (miniatures DWM), recherche immédiate,
@@ -24,7 +24,7 @@ l'expérience GNOME Shell sur Windows 11 :
 - **Sécurité** : la barre des tâches Windows est toujours restaurée (fermeture, plantage, blocage, désinstallation),
   watchdog séparé, raccourci d'urgence, mode sans échec, protection contre les boucles de plantage.
 
-> Statut : application fonctionnelle, compilée et testée sur Windows 11 24H2 (build 26100).
+> Statut : application fonctionnelle, compilée et testée sur Windows 11 24H2 (build 26100) ; Windows 10 19041–19045 pris en charge (bureaux virtuels : format interne Windows 10, sans réorganisation des espaces).
 
 ---
 
@@ -200,7 +200,7 @@ utilisées via la projection du SDK Windows (`net8.0-windows10.0.19041.0`).
 |---|---|---|
 | Touche **Super** seule | `RegisterHotKey` ne peut pas enregistrer Win seule | Hook clavier bas niveau (`WH_KEYBOARD_LL`) sur un thread dédié. Win appuyée passe telle quelle (tous les Win+X natifs fonctionnent) ; si Win est relâchée seule, le relâchement est remplacé par « touche masque (VK 0xE8) + Win relâchée », technique d'AutoHotkey : le menu Démarrer ne s'ouvre pas. Aucun réglage système modifié. |
 | Aperçus des fenêtres | — | **Miniatures DWM** (`DwmRegisterThumbnail`) : rendu en direct par le compositeur, synchronisé avec la fenêtre réelle, coût CPU quasi nul. Repli sur l'icône si Windows ne fournit pas d'image (certaines fenêtres réduites). |
-| Workspaces | Aucune API **publique** pour créer/supprimer/changer de bureau ni déplacer la fenêtre d'un autre processus | 1) **Backend complet** via les services COM internes d'explorer (`IVirtualDesktopManagerInternal`, `IApplicationViewCollection`) : non documentés, donc **limités aux IID connus de Windows 11 23H2/24H2**, seules les méthodes stables sont appelées et le backend **s'auto-valide** au démarrage ; tout appel passe par le marshalling COM (une incompatibilité donne une erreur, jamais une corruption). 2) Sinon **repli documenté** : état lu dans le registre d'explorer + raccourcis officiels Ctrl+Win+←/→/D/F4 (pas de déplacement de fenêtres d'autres processus). |
+| Workspaces | Aucune API **publique** pour créer/supprimer/changer de bureau ni déplacer la fenêtre d'un autre processus | 1) **Backend complet** via les services COM internes d'explorer (`IVirtualDesktopManagerInternal`, `IApplicationViewCollection`) : non documentés, donc **limités aux IID connus de Windows 10 (19041–19045) et Windows 11 23H2/24H2**, seules les méthodes stables sont appelées et le backend **s'auto-valide** au démarrage ; tout appel passe par le marshalling COM (une incompatibilité donne une erreur, jamais une corruption). 2) Sinon **repli documenté** : état lu dans le registre d'explorer + raccourcis officiels Ctrl+Win+←/→/D/F4 (pas de déplacement de fenêtres d'autres processus). |
 | Changement d'espace détecté | Pas d'événement public | `RegNotifyChangeKeyValue` sur l'état d'explorer + événements `EVENT_OBJECT_CLOAKED` (aucun polling). |
 | Remplacer la barre des tâches | Pas d'API « remplacer le shell » non destructive | La barre native passe en **masquage automatique** (`SHAppBarMessage ABM_SETSTATE`, état d'origine sauvegardé) puis ses fenêtres sont masquées ; explorer la réaffichant de façon asynchrone (bande de 2 px), elle est re-masquée pendant 6 s puis à chaque réapparition. Tout est restauré à la fermeture ; un **watchdog** restaure en cas de plantage ou blocage. |
 | Barre supérieure | — | AppBar documentée (`SHAppBarMessage`) : les fenêtres maximisées restent dessous ; reçoit `ABN_FULLSCREENAPP`. |
@@ -290,7 +290,7 @@ Autres fichiers : `logs\` (5 fichiers × 2 Mo max), `state\taskbar.json` (état 
 ## Limitations connues
 
 - **Workspaces complets** (créer/supprimer/réordonner/déplacer une fenêtre) uniquement sur les builds de
-  Windows 11 dont l'interface interne est connue (23H2, 24H2). Ailleurs : mode limité documenté
+  Windows dont l'interface interne est connue (Windows 10 2004–22H2, Windows 11 23H2/24H2 ; sur Windows 10 la réorganisation des espaces par glisser n'existe pas). Ailleurs : mode limité documenté
   (changement/création/fermeture de l'espace courant via les raccourcis Windows, pas de déplacement de
   fenêtres). Le diagnostic (`--diag`) indique le mode actif.
 - Le **mode dynamique** n'est actif qu'avec le backend complet.

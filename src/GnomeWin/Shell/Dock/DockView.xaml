@@ -25,7 +25,7 @@
             <!-- Show Applications (Ubuntu: last position, 3x3 dots) -->
             <Grid x:Name="ShowApps" DockPanel.Dock="Bottom" Background="Transparent" Margin="1"
                   Width="{Binding ItemSize, ElementName=Root}" Height="{Binding ItemSize, ElementName=Root}"
-                  ToolTipService.InitialShowDelay="350" Cursor="Hand">
+                  ToolTipService.InitialShowDelay="350" ToolTipService.ShowDuration="2500" ToolTipService.Placement="Top" Cursor="Hand">
                 <Border x:Name="ShowAppsHighlight" CornerRadius="10" Margin="2" Background="Transparent" />
                 <UniformGrid Rows="3" Columns="3" Width="18" Height="18" HorizontalAlignment="Center" VerticalAlignment="Center" IsHitTestVisible="False">
                     <Ellipse Width="3.5" Height="3.5" Fill="{DynamicResource Brush.DockFg}" />
@@ -48,9 +48,14 @@
                 </ItemsControl.ItemsPanel>
                 <ItemsControl.ItemTemplate>
                     <DataTemplate DataType="{x:Type dock:DockItemViewModel}">
+                        <StackPanel Orientation="{Binding Orientation, ElementName=Root}">
+                        <!-- GNOME: thin separator between pinned apps and running-only apps -->
+                        <Border x:Name="Sep" Visibility="Collapsed" IsHitTestVisible="False" CornerRadius="0.5"
+                                Background="{DynamicResource Brush.DockFg}" Opacity="0.3"
+                                Width="1" Height="{Binding IconSize, ElementName=Root}" Margin="5,0" VerticalAlignment="Center" />
                         <Grid x:Name="Item" Background="Transparent" Margin="1"
                               Width="{Binding ItemSize, ElementName=Root}" Height="{Binding ItemSize, ElementName=Root}"
-                              ToolTipService.InitialShowDelay="350" ToolTip="{Binding Name}">
+                              ToolTipService.InitialShowDelay="350" ToolTipService.ShowDuration="2500" ToolTipService.Placement="Top" ToolTip="{Binding Name}">
                             <Border x:Name="Highlight" CornerRadius="10" Margin="2" Background="Transparent" />
                             <Border x:Name="DropMarker" Width="3" HorizontalAlignment="Left" Margin="-3,6,0,6"
                                     CornerRadius="2" Background="{DynamicResource Brush.Accent}" Visibility="Collapsed" />
@@ -75,7 +80,17 @@
                                 </ItemsControl.ItemsPanel>
                             </ItemsControl>
                         </Grid>
+                        </StackPanel>
                         <DataTemplate.Triggers>
+                            <DataTrigger Binding="{Binding SeparatorBefore}" Value="True">
+                                <Setter TargetName="Sep" Property="Visibility" Value="Visible" />
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding Orientation, ElementName=Root}" Value="Vertical">
+                                <Setter TargetName="Sep" Property="Width" Value="{Binding IconSize, ElementName=Root}" />
+                                <Setter TargetName="Sep" Property="Height" Value="1" />
+                                <Setter TargetName="Sep" Property="Margin" Value="0,5" />
+                                <Setter TargetName="Sep" Property="HorizontalAlignment" Value="Center" />
+                            </DataTrigger>
                             <DataTrigger Binding="{Binding IsActive}" Value="True">
                                 <Setter TargetName="Highlight" Property="Background" Value="{StaticResource DockActive}" />
                             </DataTrigger>

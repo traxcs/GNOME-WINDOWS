@@ -73,7 +73,6 @@ public sealed class AppGridView : Grid
             Margin = new Thickness(6),
             Background = Brushes.Transparent,
             Cursor = Cursors.Hand,
-            ToolTip = app.Name,
         };
         tile.MouseEnter += (_, _) => { if (!ReferenceEquals(SelectedApp, app)) tile.Background = new SolidColorBrush(Color.FromArgb(0x26, 0xFF, 0xFF, 0xFF)); };
         tile.MouseLeave += (_, _) => { if (!ReferenceEquals(SelectedApp, app)) tile.Background = Brushes.Transparent; };

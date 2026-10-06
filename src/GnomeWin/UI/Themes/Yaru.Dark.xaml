@@ -9,6 +9,7 @@
     <SolidColorBrush x:Key="Brush.PanelBg" Color="#FF000000" />
     <SolidColorBrush x:Key="Brush.PanelFg" Color="#FFF7F7F7" />
     <SolidColorBrush x:Key="Brush.PanelHover" Color="#33FFFFFF" />
+    <SolidColorBrush x:Key="Brush.PanelActive" Color="#40FFFFFF" />
     <SolidColorBrush x:Key="Brush.PopupBg" Color="#FF2C2C2C" />
     <SolidColorBrush x:Key="Brush.PopupBorder" Color="#14FFFFFF" />
     <SolidColorBrush x:Key="Brush.CardBg" Color="#FF424242" />

@@ -95,7 +95,7 @@ public sealed class SettingsWindow : Window
         RefreshSidebar(string.Empty);
         ShowPanel("appearance");
 
-        SourceInitialized += (_, _) => { UI.Components.ShellWindow.UseSoftwareRendering(this); ApplyTitleBarTheme(); };
+        SourceInitialized += (_, _) => { if (UI.Components.ShellWindow.SoftwareRenderingEnabled) UI.Components.ShellWindow.UseSoftwareRendering(this); ApplyTitleBarTheme(); };
         ThemeManager.ThemeChanged += ApplyTitleBarTheme;
         Closed += (_, _) => { ThemeManager.ThemeChanged -= ApplyTitleBarTheme; _hook?.CancelCapture(); };
         PreviewKeyDown += (_, e) =>
@@ -403,6 +403,42 @@ public sealed class SettingsWindow : Window
         return RowShell(title, subtitle, c);
     }
 
+    private static UIElement DockPositionRow(DockSettings d)
+    {
+        var c = new ComboBox { MinWidth = 170 };
+        string[] labels = { L("En bas", "Bottom"), L("Au centre", "Centre"), L("À gauche", "Left"), L("À droite", "Right") };
+        foreach (var l in labels) c.Items.Add(new ComboBoxItem { Content = l });
+        int Current() => d.Position switch
+        {
+            DockPosition.Left => 2,
+            DockPosition.Right => 3,
+            _ => d.Extended && d.CenterIcons ? 1 : 0,
+        };
+        c.SelectedIndex = Current();
+        bool syncing = false;
+        c.SelectionChanged += (_, _) =>
+        {
+            if (syncing) return;
+            switch (c.SelectedIndex)
+            {
+                case 0: d.Position = DockPosition.Bottom; d.Extended = false; break;
+                case 1: d.Position = DockPosition.Bottom; d.Extended = true; d.CenterIcons = true; break;
+                case 2: d.Position = DockPosition.Left; break;
+                case 3: d.Position = DockPosition.Right; break;
+            }
+        };
+        void OnChanged(object? _, System.ComponentModel.PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName is not (nameof(DockSettings.Extended) or nameof(DockSettings.CenterIcons) or nameof(DockSettings.Position))) return;
+            syncing = true;
+            try { c.SelectedIndex = Current(); }
+            finally { syncing = false; }
+        }
+        c.Loaded += (_, _) => { d.PropertyChanged -= OnChanged; d.PropertyChanged += OnChanged; };
+        c.Unloaded += (_, _) => d.PropertyChanged -= OnChanged;
+        return RowShell(L("Position sur l'écran", "Position on screen"), null, c);
+    }
+
     private static UIElement SliderRow(string title, string? subtitle, object source, string path, double min, double max, double tick, Func<double, string> format)
     {
         var panel = new StackPanel { Orientation = Orientation.Horizontal };
@@ -517,11 +553,27 @@ public sealed class SettingsWindow : Window
     {
         var d = _settings.Current.Displays;
         var g = _settings.Current.General;
+        var monitors = new MonitorManager().Monitors;
+        var screenRows = new List<UIElement>();
+        for (int i = 0; i < monitors.Count; i++)
+        {
+            var m = monitors[i];
+            string label = monitors.Count > 1 ? $"{i + 1}. " : string.Empty;
+            screenRows.Add(LinkRow(label + (m.IsPrimary ? L("Écran principal", "Primary display") : L("Écran", "Display")),
+                $"{m.Bounds.Width} × {m.Bounds.Height} · {L("Échelle", "Scale")} {Math.Round(m.Scale * 100)} %",
+                () => WindowsSettings.Open("ms-settings:display")));
+        }
+        _status?.EnsureDetails();
+        if (_status?.Brightness is int bright)
+        {
+            var slider = new Slider { Minimum = 0, Maximum = 100, Width = 240, Value = bright };
+            slider.SetResourceReference(StyleProperty, "ShellSlider");
+            slider.ValueChanged += (_, e) => _status.SetBrightness((int)e.NewValue);
+            screenRows.Add(RowShell(L("Luminosité", "Brightness"), null, slider));
+        }
+        screenRows.Add(WinLink(L("Éclairage nocturne", "Night Light"), "ms-settings:nightlight"));
         return Page(
-            Group(L("Écrans", "Displays"), null,
-                WinLink(L("Résolution, échelle et orientation", "Resolution, scale and orientation"), "ms-settings:display"),
-                WinLink(L("Éclairage nocturne", "Night Light"), "ms-settings:nightlight"),
-                WinLink(L("Plusieurs écrans", "Multiple displays"), "ms-settings:display-advanced")),
+            Group(L("Écrans", "Displays"), L("Résolution, échelle et orientation se règlent dans les Paramètres Windows.", "Resolution, scale and orientation are set in Windows Settings."), screenRows.ToArray()),
             Group(L("Bureau", "Desktop"), null,
                 SwitchRow(L("Barre supérieure", "Top bar"), null, g, nameof(g.ShowTopBar)),
                 ComboRow(L("Barre supérieure sur", "Top bar on"), null, d, nameof(d.TopBarMonitors), (MonitorPlacement.All, "Tous les écrans", "All displays"), (MonitorPlacement.Primary, "Écran principal", "Primary display")),
@@ -544,7 +596,7 @@ public sealed class SettingsWindow : Window
             rows.Add(RowShell(L("Volume du système", "System Volume"), null, slider));
             rows.Add(SwitchRowAction(L("Couper le son", "Mute"), null, s.Muted, v => s.Muted = v));
         }
-        rows.Add(WinLink(L("Périphérique de sortie", "Output device"), "ms-settings:sound"));
+        rows.Insert(0, LinkRow(L("Périphérique de sortie", "Output Device"), _status?.AudioDeviceName ?? L("Aucun", "None"), () => WindowsSettings.Open("ms-settings:sound")));
         return Page(
             Group(L("Sortie", "Output"), null, rows.ToArray()),
             Group(L("Entrée", "Input"), null, WinLink(L("Périphérique d'entrée", "Input device"), "ms-settings:sound")),
@@ -557,12 +609,43 @@ public sealed class SettingsWindow : Window
         var rows = new List<UIElement>();
         if (s is { HasBattery: true })
             rows.Add(InfoRow(L("Batterie", "Battery"), $"{s.BatteryPercent} %" + (s.Charging ? " — " + L("en charge", "charging") : string.Empty)));
-        rows.Add(WinLink(L("Mode d'alimentation", "Power Mode"), "ms-settings:powersleep"));
-        return Page(
-            Group(L("Alimentation", "Power"), null, rows.ToArray()),
-            Group(L("Économie d'énergie", "Power Saving"), null,
-                WinLink(L("Économiseur de batterie", "Battery saver"), "ms-settings:batterysaver"),
-                WinLink(L("Écran et mise en veille", "Screen and sleep"), "ms-settings:powersleep")));
+        var available = WindowsSettings.AvailablePowerSchemes();
+        var modes = new (Guid Id, string Fr, string En, string Desc)[]
+        {
+            (WindowsSettings.SchemePerformance, "Performances", "Performance", L("Hautes performances et consommation électrique élevée.", "High performance and power usage.")),
+            (WindowsSettings.SchemeBalanced, "Équilibré", "Balanced", L("Performances et consommation électrique standard.", "Standard performance and power usage.")),
+            (WindowsSettings.SchemePowerSaver, "Économie d'énergie", "Power Saver", L("Performances et consommation électrique réduites.", "Reduced performance and power usage.")),
+        };
+        Guid active = WindowsSettings.ActivePowerScheme;
+        var modeRows = modes.Where(m => available.Contains(m.Id)).Select(m =>
+            RadioRow("power", L(m.Fr, m.En), m.Desc, m.Id == active, () => WindowsSettings.SetPowerScheme(m.Id))).ToList();
+
+        var delays = new (int Minutes, string Label)[] { (1, "1 min"), (2, "2 min"), (3, "3 min"), (5, "5 min"), (10, "10 min"), (15, "15 min"), (30, "30 min"), (60, "1 h"), (0, L("Jamais", "Never")) };
+        UIElement DelayRow(string title, string? subtitle, int current, Action<int> set)
+        {
+            var c = new ComboBox { MinWidth = 150 };
+            foreach (var d in delays) c.Items.Add(new ComboBoxItem { Content = d.Label, Tag = d.Minutes });
+            int idx = Array.FindIndex(delays, d => d.Minutes == current);
+            if (idx < 0) { c.Items.Add(new ComboBoxItem { Content = $"{current} min", Tag = current }); idx = c.Items.Count - 1; }
+            c.SelectedIndex = idx;
+            c.SelectionChanged += (_, _) => { if (c.SelectedItem is ComboBoxItem it) set((int)it.Tag); };
+            return RowShell(title, subtitle, c);
+        }
+
+        var page = Page(Group(null, null, rows.ToArray()));
+        if (s is { HasBattery: true })
+        {
+            var g = _settings.Current.General;
+            page.Children.Add(Group(L("Général", "General"), null,
+                SwitchRow(L("Afficher l'icône de batterie", "Show Battery Icon"), L("Dans la barre supérieure.", "In the top bar."), g, nameof(g.ShowBatteryIcon)),
+                SwitchRow(L("Afficher le pourcentage de batterie", "Show Battery Percentage"), L("À côté de l'icône de batterie.", "Next to the battery icon."), g, nameof(g.ShowBatteryPercentage))));
+        }
+        if (modeRows.Count > 1) page.Children.Add(Group(L("Mode d'alimentation", "Power Mode"), null, modeRows.ToArray()));
+        page.Children.Add(Group(L("Économie d'énergie", "Power Saving"), null,
+            DelayRow(L("Écran vide", "Screen Blank"), L("Délai avant que l'écran ne s'éteigne.", "Turns the screen off after a period of inactivity."), WindowsSettings.ScreenBlankMinutes, v => WindowsSettings.ScreenBlankMinutes = v),
+            DelayRow(L("Mise en veille automatique", "Automatic Suspend"), L("Délai avant la mise en veille.", "Pauses the computer after a period of inactivity."), WindowsSettings.SuspendMinutes, v => WindowsSettings.SuspendMinutes = v),
+            WinLink(L("Économiseur de batterie", "Battery saver"), "ms-settings:batterysaver")));
+        return page;
     }
 
     private UIElement BuildMultitasking()
@@ -599,9 +682,19 @@ public sealed class SettingsWindow : Window
                 ShowPanelContent("appearance");
             }));
 
+        bool windowsDark = WindowsSettings.WindowsDarkMode;
         var modes = new WrapPanel { HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(8, 14, 8, 6) };
-        foreach (var (m, fr, en) in new[] { (ThemeMode.Light, "Défaut", "Default"), (ThemeMode.Dark, "Sombre", "Dark"), (ThemeMode.System, "Comme Windows", "Follow Windows") })
-            modes.Children.Add(ModeCard(m, L(fr, en), g.Theme == m, () => { g.Theme = m; ShowPanelContent("appearance"); }));
+        foreach (var (m, fr, en) in new[] { (ThemeMode.Light, "Défaut", "Default"), (ThemeMode.Dark, "Sombre", "Dark") })
+        {
+            bool selected = g.Theme == ThemeMode.System ? (m == ThemeMode.Dark) == windowsDark : g.Theme == m;
+            modes.Children.Add(ModeCard(m, L(fr, en), selected, () =>
+            {
+                WindowsSettings.WindowsDarkMode = m == ThemeMode.Dark;
+                g.Theme = ThemeMode.System;
+                ThemeManager.Apply(ThemeMode.System);
+                ShowPanelContent("appearance");
+            }));
+        }
 
         var accents = new WrapPanel { HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(12, 4, 12, 16) };
         var list = g.Style == DesignStyle.Ubuntu
@@ -617,10 +710,54 @@ public sealed class SettingsWindow : Window
         return Page(
             GroupBox(L("Style du bureau", "Desktop Style"), styles),
             GroupBox(L("Style", "Style"), styleCard),
-            Group(L("Arrière-plan", "Background"), null,
-                WinLink(L("Fond d'écran", "Wallpaper"), "ms-settings:personalization-background", L("Le fond d'écran Windows est utilisé partout, y compris dans la vue d'ensemble.", "The Windows wallpaper is used everywhere, including the Overview.")),
+            BuildBackgroundGallery(),
+            Group(null, null,
+                SwitchRowAction(L("Effets de transparence", "Transparency effects"), L("Paramètre Windows", "Windows setting"), WindowsSettings.TransparencyEffects, v => WindowsSettings.TransparencyEffects = v),
                 ComboRow(L("Arrière-plan de la vue d'ensemble", "Overview background"), null, o, nameof(o.Background),
                     (OverviewBackground.BlurredWallpaper, "Fond d'écran flouté", "Blurred wallpaper"), (OverviewBackground.Wallpaper, "Fond d'écran assombri", "Dimmed wallpaper"), (OverviewBackground.Solid, "Couleur unie", "Solid color"))));
+    }
+
+    private UIElement BuildBackgroundGallery()
+    {
+        string? current = Services.Wallpaper.WallpaperProvider.CurrentWallpaperPath();
+        var grid = new WrapPanel { Margin = new Thickness(10), HorizontalAlignment = HorizontalAlignment.Center };
+        var files = Services.Wallpaper.WallpaperProvider.BuiltInWallpapers().ToList();
+        if (current != null && !files.Contains(current, StringComparer.OrdinalIgnoreCase)) files.Insert(0, current);
+        foreach (var file in files)
+        {
+            var img = new Image { Source = Services.Wallpaper.WallpaperProvider.Thumbnail(file), Width = 140, Height = 88, Stretch = Stretch.UniformToFill };
+            bool selected = string.Equals(file, current, StringComparison.OrdinalIgnoreCase);
+            var frame = new Border
+            {
+                CornerRadius = new CornerRadius(10), BorderThickness = new Thickness(3), Padding = new Thickness(2), Margin = new Thickness(5),
+                Child = new Border { CornerRadius = new CornerRadius(7), ClipToBounds = true, Child = img }, Cursor = Cursors.Hand,
+                BorderBrush = Brushes.Transparent, ToolTip = Path.GetFileNameWithoutExtension(file),
+            };
+            if (selected) frame.SetResourceReference(Border.BorderBrushProperty, "Brush.Accent");
+            string path = file;
+            frame.MouseLeftButtonUp += (_, _) =>
+            {
+                if (Services.Wallpaper.WallpaperProvider.SetWindowsWallpaper(path)) ShowPanelContent("appearance");
+            };
+            grid.Children.Add(frame);
+        }
+        var add = new Button { Content = "+ " + L("Ajouter une image…", "Add Picture…") };
+        add.SetResourceReference(StyleProperty, "FlatButton");
+        add.Click += (_, _) =>
+        {
+            var dlg = new OpenFileDialog { Filter = "Images|*.jpg;*.jpeg;*.png;*.bmp;*.webp" };
+            if (dlg.ShowDialog(this) == true && Services.Wallpaper.WallpaperProvider.SetWindowsWallpaper(dlg.FileName)) ShowPanelContent("appearance");
+        };
+        var header = new DockPanel { Margin = new Thickness(0, 0, 0, 10) };
+        DockPanel.SetDock(add, System.Windows.Controls.Dock.Right);
+        header.Children.Add(add);
+        header.Children.Add(new TextBlock { Text = L("Arrière-plan", "Background"), FontWeight = FontWeights.Bold, FontSize = 14, VerticalAlignment = VerticalAlignment.Center });
+        var card = new Border { CornerRadius = new CornerRadius(12), Child = grid };
+        card.SetResourceReference(Border.BackgroundProperty, "Brush.CardBg");
+        var p = new StackPanel { Margin = new Thickness(0, 12, 0, 12) };
+        p.Children.Add(header);
+        p.Children.Add(card);
+        return p;
     }
 
     private static UIElement Thumbnail(Brush background, Brush back, Brush front, Brush? accent, bool selected, string label, Action click)
@@ -712,9 +849,9 @@ public sealed class SettingsWindow : Window
                     (DockVisibility.Intellihide, "Masquage intelligent", "Intellihide"),
                     (DockVisibility.AutoHide, "Masquage automatique", "Auto-hide")),
                 SwitchRow(L("Mode panneau", "Panel mode"), L("Le dock s'étend jusqu'aux bords de l'écran.", "The dock extends to the screen edge."), d, nameof(d.Extended)),
+                SwitchRow(L("Centrer les icônes", "Center icons"), L("En mode panneau, les applications sont centrées sur le bord de l'écran.", "In panel mode, apps are centred along the screen edge."), d, nameof(d.CenterIcons)),
                 SliderRow(L("Taille des icônes", "Icon size"), null, d, nameof(d.IconSize), 24, 64, 2, v => $"{v:0}"),
-                ComboRow(L("Position sur l'écran", "Position on screen"), null, d, nameof(d.Position),
-                    (DockPosition.Bottom, "En bas", "Bottom"), (DockPosition.Left, "À gauche", "Left"), (DockPosition.Right, "À droite", "Right"))),
+                DockPositionRow(d)),
             Group(L("Comportement", "Behavior"), null,
                 ComboRow(L("Clic sur l'application active", "Click on the focused app"), null, d, nameof(d.ActiveClick),
                     (DockActiveClick.Minimize, "Réduire", "Minimize"), (DockActiveClick.CycleWindows, "Fenêtre suivante", "Cycle windows"), (DockActiveClick.ShowPreviews, "Afficher les aperçus", "Show previews")),
@@ -747,8 +884,8 @@ public sealed class SettingsWindow : Window
                 WinLink(L("Applications au démarrage", "Startup Apps"), "ms-settings:startupapps"),
                 WinLink(L("Applications installées", "Installed Apps"), "ms-settings:appsfeatures")));
         page.Children.Add(rows.Count > 0
-            ? Group(L("Favoris", "Favorites"), L("Applications épinglées au dock. Glissez une application de la grille vers le dock pour l'ajouter.", "Apps pinned to the dock. Drag an app from the grid to the dock to add it."), rows.ToArray())
-            : Note(L("Aucune application épinglée.", "No pinned apps.")));
+            ? Group(L("Favoris", "Favorites"), L("Applications épinglées au dock. Épinglez une application par clic droit › « Épingler au dock » ou en la glissant de la grille vers le dock ; glissez-la hors du dock pour la retirer.", "Apps pinned to the dock. Pin with right-click › Pin to Dock or by dragging from the grid; drag out of the dock to remove."), rows.ToArray())
+            : Note(L("Aucune application épinglée. Clic droit sur une application du dock ou de la grille › « Épingler au dock ».", "No pinned apps. Right-click an app in the dock or the grid › Pin to Dock.")));
         return page;
     }
 
@@ -773,9 +910,32 @@ public sealed class SettingsWindow : Window
                 SwitchRow(L("Calculatrice", "Calculator"), null, o, nameof(o.SearchCalculator))));
     }
 
-    private UIElement BuildMouse() => Page(
-        Group(L("Souris", "Mouse"), null, WinLink(L("Souris", "Mouse"), "ms-settings:mousetouchpad")),
-        Group(L("Pavé tactile", "Touchpad"), null, WinLink(L("Pavé tactile", "Touchpad"), "ms-settings:devices-touchpad")));
+    private static UIElement LiveSlider(string title, string? subtitle, double min, double max, double tick, double value, Action<int> apply, string left, string right)
+    {
+        var s = new Slider { Minimum = min, Maximum = max, Width = 200, TickFrequency = tick, IsSnapToTickEnabled = true, Value = value };
+        s.SetResourceReference(StyleProperty, "ShellSlider");
+        s.ValueChanged += (_, e) => apply((int)Math.Round(e.NewValue));
+        var panel = new StackPanel { Orientation = Orientation.Horizontal };
+        TextBlock Cap(string t) { var x = new TextBlock { Text = t, FontSize = 12, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(6, 0, 6, 0) }; x.SetResourceReference(TextBlock.ForegroundProperty, "Brush.FgDim"); return x; }
+        panel.Children.Add(Cap(left));
+        panel.Children.Add(s);
+        panel.Children.Add(Cap(right));
+        return RowShell(title, subtitle, panel);
+    }
+
+    private UIElement BuildMouse()
+    {
+        bool right = WindowsSettings.PrimaryButtonIsRight;
+        return Page(
+            Group(L("Général", "General"), null,
+                RadioRow("primary", L("Bouton principal : gauche", "Primary Button: Left"), null, !right, () => WindowsSettings.PrimaryButtonIsRight = false),
+                RadioRow("primary", L("Bouton principal : droit", "Primary Button: Right"), L("Pour les gauchers.", "For left-handed use."), right, () => WindowsSettings.PrimaryButtonIsRight = true)),
+            Group(L("Souris", "Mouse"), null,
+                LiveSlider(L("Vitesse du pointeur", "Pointer Speed"), null, 1, 20, 1, WindowsSettings.MouseSpeed, v => WindowsSettings.MouseSpeed = v, L("Lent", "Slow"), L("Rapide", "Fast")),
+                LiveSlider(L("Délai du double-clic", "Double-Click Delay"), null, 200, 900, 50, WindowsSettings.DoubleClickTime, v => WindowsSettings.DoubleClickTime = v, L("Court", "Short"), L("Long", "Long")),
+                LiveSlider(L("Défilement", "Scroll Speed"), L("Lignes par cran de molette", "Lines per wheel notch"), 1, 20, 1, WindowsSettings.WheelScrollLines, v => WindowsSettings.WheelScrollLines = v, "1", "20")),
+            Group(L("Pavé tactile", "Touchpad"), null, WinLink(L("Gestes et sensibilité", "Gestures and sensitivity"), "ms-settings:devices-touchpad")));
+    }
 
     private UIElement BuildPrinters() => Page(Group(null, null, WinLink(L("Imprimantes et scanners", "Printers & scanners"), "ms-settings:printers")));
 
@@ -789,7 +949,8 @@ public sealed class SettingsWindow : Window
         var g = _settings.Current.General;
         return Page(
             Group(L("Vision", "Seeing"), null,
-                SwitchRow(L("Effets d'animation", "Animation Effects"), L("Les effets peuvent gêner ou ralentir les machines modestes.", "Effects can be distracting or slow on low-end machines."), g, nameof(g.AnimationsEnabled)),
+                SwitchRowAction(L("Effets d'animation", "Animation Effects"), L("Shell et Windows. Les effets peuvent gêner ou ralentir les machines modestes.", "Shell and Windows. Effects can be distracting or slow on low-end machines."),
+                    g.AnimationsEnabled, v => { g.AnimationsEnabled = v; WindowsSettings.ClientAreaAnimations = v; }),
                 ComboRow(L("Vitesse des animations", "Animation Speed"), null, g, nameof(g.AnimationSpeed), (AnimationSpeed.Normal, "Normale", "Normal"), (AnimationSpeed.Fast, "Rapide", "Fast"), (AnimationSpeed.Slow, "Lente", "Slow")),
                 WinLink(L("Contraste élevé et taille du texte", "High contrast and text size"), "ms-settings:easeofaccess-display")),
             Group(L("Autres", "Other"), null,
@@ -816,6 +977,9 @@ public sealed class SettingsWindow : Window
         var page = Page(Group(L("Saisie", "Input"), null,
             SwitchRow(L("Touche Super", "Super key"), L("Ouvre la vue d'ensemble. Désactivé : aucun hook clavier, la touche Windows garde son comportement.", "Opens the overview. Off: no keyboard hook, the Windows key keeps its behaviour."), k, nameof(k.InterceptSuperKey)),
             WinLink(L("Disposition du clavier", "Keyboard layout"), "ms-settings:regionlanguage")));
+        page.Children.Add(Group(L("Répétition des touches", "Repeat Keys"), L("Paramètres Windows : s'applique à toutes les applications.", "Windows settings: applies to every application."),
+            LiveSlider(L("Délai", "Delay"), null, 0, 3, 1, 3 - WindowsSettings.KeyboardDelay, v => WindowsSettings.KeyboardDelay = 3 - v, L("Long", "Long"), L("Court", "Short")),
+            LiveSlider(L("Vitesse", "Speed"), null, 0, 31, 1, WindowsSettings.KeyboardSpeed, v => WindowsSettings.KeyboardSpeed = v, L("Lent", "Slow"), L("Rapide", "Fast"))));
         page.Children.Add(Group(L("Système", "System"), null, names.Where(n => n.System).Select(n => ShortcutRow(k, n.Key, L(n.Fr, n.En))).ToArray()));
         page.Children.Add(Group(L("Navigation", "Navigation"), null, names.Where(n => !n.System).Select(n => ShortcutRow(k, n.Key, L(n.Fr, n.En))).ToArray()));
         page.Children.Add(Group(L("Lanceurs", "Launchers"), null, Enumerable.Range(1, 9).Select(i => ShortcutRow(k, "LaunchDockItem" + i, L($"Lancer l'application {i} du dock", $"Launch dock app {i}"))).ToArray()));
@@ -897,16 +1061,22 @@ public sealed class SettingsWindow : Window
                 ComboRow(L("Langue de GnomeWin", "GnomeWin language"), L("Appliquée entièrement au prochain démarrage.", "Fully applied at next start."), g, nameof(g.Language),
                     (UiLanguage.System, "Système", "System"), (UiLanguage.French, "Français", "French"), (UiLanguage.English, "Anglais", "English")),
                 WinLink(L("Langue et région de Windows", "Windows language & region"), "ms-settings:regionlanguage")),
-            Group(L("Date et heure", "Date & Time"), null, WinLink(L("Date et heure", "Date & Time"), "ms-settings:dateandtime")),
+            Group(L("Date et heure", "Date & Time"), null,
+                LinkRow(L("Date et heure", "Date & Time"), DateTime.Now.ToString("f", Loc.Culture), () => WindowsSettings.Open("ms-settings:dateandtime")),
+                LinkRow(L("Fuseau horaire", "Time Zone"), WindowsSettings.TimeZone(), () => WindowsSettings.Open("ms-settings:dateandtime"))),
             Group(L("Utilisateurs", "Users"), null, WinLink(L("Comptes", "Accounts"), "ms-settings:yourinfo")),
             Group(L("Démarrage", "Startup"), null,
                 SwitchRow(L("Lancer GnomeWin à l'ouverture de session", "Launch GnomeWin at login"), null, g, nameof(g.LaunchAtStartup)),
                 SwitchRow(L("Remplacer la barre des tâches Windows", "Replace the Windows taskbar"), L("Masquage réversible, toujours restaurée à la fermeture.", "Reversible, always restored on exit."), g, nameof(g.ReplaceTaskbar))),
             Group(L("Performances", "Performance"), null,
-                SwitchRow(L("Économie de mémoire", "Memory saver"), L("Rendu logiciel : environ 20 Mo de moins. Désactivez-le si les animations de la vue d'ensemble manquent de fluidité. Prend effet au prochain démarrage.", "Software rendering: about 20 MB less. Turn off if Overview animations are not smooth enough. Applies at next start."), g, nameof(g.LowMemoryMode))),
+                SwitchRow(L("Économie de mémoire", "Memory saver"), L("Rendu sans carte graphique : environ 70 Mo de moins, la vue d'ensemble et les applications s'ouvrent sans animation. Désactivez-le pour les animations fluides de GNOME. Prend effet au prochain démarrage.", "Software rendering: about 70 MB less, the Overview and app grid open without animation. Turn off for GNOME's smooth animations. Applies at next start."), g, nameof(g.LowMemoryMode))),
             Group(L("À propos", "About"), null,
+                LinkRow(L("Nom de l'appareil", "Device Name"), Environment.MachineName, () => WindowsSettings.Open("ms-settings:about")),
+                InfoRow(L("Système d'exploitation", "Operating System"), WindowsSettings.OsName()),
+                InfoRow(L("Processeur", "Processor"), WindowsSettings.Processor()),
+                InfoRow(L("Mémoire", "Memory"), WindowsSettings.Memory()),
+                InfoRow(L("Capacité du disque", "Disk Capacity"), WindowsSettings.DiskCapacity()),
                 InfoRow("GnomeWin", version),
-                InfoRow(L("Système", "OS"), Environment.OSVersion.VersionString),
                 InfoRow(L("Mémoire utilisée par GnomeWin", "Memory used by GnomeWin"), $"{Environment.WorkingSet / 1048576} Mo"),
                 LinkRow(L("Diagnostic", "Diagnostics"), L("Copier le rapport dans le presse-papiers", "Copy the report to the clipboard"), () => { try { Clipboard.SetText(_diagnostics()); } catch { } }, external: false)),
             Group(L("Maintenance", "Maintenance"), null,

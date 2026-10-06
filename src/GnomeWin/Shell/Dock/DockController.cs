@@ -77,6 +77,7 @@ public sealed class DockController : IDisposable
             vm.App = g.App;
             vm.IsPinned = g.IsPinned;
             vm.SetWindows(g.Windows.OrderByDescending(w => w.ActivationStamp).ToList());
+            vm.SeparatorBefore = !g.IsPinned && target.Count > 0 && target[^1].IsPinned;
             target.Add(vm);
         }
 
@@ -113,6 +114,7 @@ public sealed class DockController : IDisposable
         view.ShowAppsClicked += () => ShowApplications?.Invoke();
         view.ItemScrolled += (item, dir) => CycleWindows(item, dir);
         view.AppDropped += OnAppDropped;
+        view.ItemDraggedOut += item => { if (item.IsPinned) _apps.Unpin(item.Id); };
         return view;
     }
 
@@ -286,8 +288,9 @@ public sealed class DockController : IDisposable
         {
             if (wantedKeys.Contains(key)) continue;
             if (_appBars.Remove(key, out var bar)) bar.Dispose();
-            _docks[key].Close();
+            var closing = _docks[key];
             _docks.Remove(key);
+            closing.Close();
         }
         foreach (var mon in wanted)
         {
@@ -376,6 +379,7 @@ public sealed class DockController : IDisposable
 
     public void EvaluateVisibility()
     {
+        if (_disposed) return;
         var s = _settings.Current;
         foreach (var dock in _docks.Values)
         {
@@ -427,11 +431,15 @@ public sealed class DockController : IDisposable
         else if (section is DisplaySettings) SyncWindows();
     }
 
+    private bool _disposed;
+
     public void Dispose()
     {
+        _disposed = true;
         foreach (var bar in _appBars.Values) bar.Dispose();
         _appBars.Clear();
-        foreach (var d in _docks.Values) d.Close();
+        var docks = _docks.Values.ToList();
         _docks.Clear();
+        foreach (var d in docks) d.Close();
     }
 }

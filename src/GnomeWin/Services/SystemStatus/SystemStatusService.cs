@@ -35,6 +35,7 @@ public sealed class SystemStatusService : IDisposable
     public float Volume { get => _audio.Volume; set => _audio.Volume = value; }
     public bool Muted { get => _audio.Muted; set => _audio.Muted = value; }
     public bool AudioAvailable => _audio.IsAvailable;
+    public string? AudioDeviceName => _audio.DeviceName;
 
     public SystemStatusService()
     {
@@ -123,7 +124,7 @@ public sealed class SystemStatusService : IDisposable
         {
             HasBattery = s.BatteryFlag != 128 && s.BatteryFlag != 255;
             BatteryPercent = s.BatteryLifePercent <= 100 ? s.BatteryLifePercent : 0;
-            Charging = s.ACLineStatus == 1;
+            Charging = s.ACLineStatus == 1 && (s.BatteryFlag & 8) != 0;
             BatterySaver = s.SystemStatusFlag == 1;
         }
         PowerChanged?.Invoke();

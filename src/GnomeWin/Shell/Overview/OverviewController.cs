@@ -21,7 +21,10 @@ public enum OverviewView { Windows, Applications, Search }
 
 public sealed class OverviewController : IDisposable
 {
-    private const int OpenMs = 260, LayoutMs = 240, ViewMs = 200;
+    private const int LayoutMs = 240;
+    private static bool Smooth => !UI.Components.ShellWindow.SoftwareRenderingEnabled;
+    private static int OpenMs => Smooth ? 260 : 0;
+    private static int ViewMs => Smooth ? 200 : 0;
 
     private sealed class Surface
     {
@@ -135,6 +138,7 @@ public sealed class OverviewController : IDisposable
 
         _releaseTimer.Stop();
         ProcessPower.SetEfficiencyMode(false);
+        var sw = System.Diagnostics.Stopwatch.StartNew();
         try
         {
             _windows.RefreshBounds();
@@ -179,6 +183,7 @@ public sealed class OverviewController : IDisposable
             }
             _search.RefreshRecentFilesIfStale();
             Render();
+            Log.Debug($"Overview open ({view}) prepared in {sw.ElapsedMilliseconds} ms");
             _openAnim.Start(0, 1, OpenMs, OnOpened);
         }
         catch (Exception ex)
@@ -200,6 +205,7 @@ public sealed class OverviewController : IDisposable
     private void OnOpened()
     {
         _state = State.Open;
+        Log.Debug($"Overview opened: {_openAnim.Frames} frames in {_openAnim.ElapsedMs:0} ms");
         Render();
     }
 
@@ -555,7 +561,9 @@ public sealed class OverviewController : IDisposable
         if (_gridDirty)
         {
             var apps = _apps.Catalog.Where(a => !a.IsTransient).OrderBy(a => a.Name, StringComparer.CurrentCultureIgnoreCase).ToList();
+            var gsw = System.Diagnostics.Stopwatch.StartNew();
             w.AppGrid.SetApps(apps);
+            Log.Debug($"App grid built: {apps.Count} tiles in {gsw.ElapsedMilliseconds} ms");
             _gridDirty = false;
         }
         w.AppGrid.ScrollToTop();

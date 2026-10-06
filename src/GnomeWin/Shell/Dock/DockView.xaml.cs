@@ -32,7 +32,7 @@ public partial class DockView : UserControl
 
     public event Action? ShowAppsClicked;
 
-    public void ConfigureShape(GnomeWin.Services.Settings.DockPosition position, bool extended)
+    public void ConfigureShape(GnomeWin.Services.Settings.DockPosition position, bool extended, bool centerIcons = true)
     {
         bool vertical = position != GnomeWin.Services.Settings.DockPosition.Bottom;
         Orientation = vertical ? Orientation.Vertical : Orientation.Horizontal;
@@ -48,8 +48,8 @@ public partial class DockView : UserControl
                 _ => new Thickness(0, 1, 0, 0),
             };
             Panel.Padding = vertical ? new Thickness(2, 4, 2, 4) : new Thickness(4, 2, 4, 2);
-            ItemsHost.VerticalAlignment = VerticalAlignment.Top;
-            ItemsHost.HorizontalAlignment = vertical ? HorizontalAlignment.Center : HorizontalAlignment.Left;
+            ItemsHost.VerticalAlignment = vertical ? (centerIcons ? VerticalAlignment.Center : VerticalAlignment.Top) : VerticalAlignment.Center;
+            ItemsHost.HorizontalAlignment = vertical ? HorizontalAlignment.Center : (centerIcons ? HorizontalAlignment.Center : HorizontalAlignment.Left);
         }
         else
         {
@@ -68,6 +68,7 @@ public partial class DockView : UserControl
     public event Action<DockItemViewModel, FrameworkElement>? ItemContextRequested;
     public event Action<DockItemViewModel, int>? ItemScrolled;
     public event Action<string, int>? AppDropped;
+    public event Action<DockItemViewModel>? ItemDraggedOut;
 
     private Point _pressPoint;
     private DockItemViewModel? _pressed;
@@ -88,6 +89,23 @@ public partial class DockView : UserControl
         ShowApps.MouseEnter += (_, _) => ShowAppsHighlight.Background = (Brush)Resources["DockHover"];
         ShowApps.MouseLeave += (_, _) => ShowAppsHighlight.Background = Brushes.Transparent;
         ShowApps.MouseLeftButtonUp += (_, e) => { ShowAppsClicked?.Invoke(); e.Handled = true; };
+        MouseLeave += (_, _) => CloseToolTips(this);
+        PreviewMouseDown += (_, _) => CloseToolTips(this);
+    }
+
+    private static void CloseToolTips(DependencyObject root)
+    {
+        int n = VisualTreeHelper.GetChildrenCount(root);
+        for (int i = 0; i < n; i++)
+        {
+            var child = VisualTreeHelper.GetChild(root, i);
+            if (child is FrameworkElement fe && fe.ToolTip != null)
+            {
+                ToolTipService.SetIsEnabled(fe, false);
+                ToolTipService.SetIsEnabled(fe, true);
+            }
+            CloseToolTips(child);
+        }
     }
 
     public IEnumerable? ItemsSource { get => ItemsHost.ItemsSource; set => ItemsHost.ItemsSource = value; }
@@ -122,8 +140,9 @@ public partial class DockView : UserControl
         var item = _pressed;
         _pressed = null;
         var data = new DataObject(DragFormat, item.Id);
-        DragDrop.DoDragDrop(this, data, DragDropEffects.Move);
+        var result = DragDrop.DoDragDrop(this, data, DragDropEffects.Move);
         ClearDropMarkers();
+        if (result == DragDropEffects.None && !IsCursorOverPanel()) ItemDraggedOut?.Invoke(item);
     }
 
     private void OnPreviewUp(object sender, MouseButtonEventArgs e)
@@ -190,6 +209,15 @@ public partial class DockView : UserControl
         int index = DropIndex(e, out _);
         AppDropped?.Invoke(id, index);
         e.Handled = true;
+    }
+
+    private bool IsCursorOverPanel()
+    {
+        if (PresentationSource.FromVisual(Panel) == null) return false;
+        GnomeWin.Platform.Win32.NativeMethods.GetCursorPos(out var p);
+        var tl = Panel.PointToScreen(new Point(0, 0));
+        var br = Panel.PointToScreen(new Point(Panel.ActualWidth, Panel.ActualHeight));
+        return p.X >= tl.X - 8 && p.X <= br.X + 8 && p.Y >= tl.Y - 8 && p.Y <= br.Y + 8;
     }
 
     private void ClearDropMarkers()

@@ -152,6 +152,10 @@ public sealed partial class AppDiscoveryService : IDisposable
         string? name = ShellApi.GetDisplayName(item, ShellApi.SIGDN_NORMALDISPLAY);
         if (string.IsNullOrWhiteSpace(id) || string.IsNullOrWhiteSpace(name)) return null;
         if (UninstallRegex().IsMatch(name)) return null;
+        if (name.StartsWith("GnomeWin (", StringComparison.OrdinalIgnoreCase) ||
+            name.StartsWith("Restaurer la barre des tâches", StringComparison.OrdinalIgnoreCase) ||
+            name.StartsWith("Restore the Windows taskbar", StringComparison.OrdinalIgnoreCase) ||
+            name is "Paramètres GnomeWin" or "GnomeWin Settings") return null;
 
         string? exe = null;
         var store = ShellApi.GetPropertyStore(item);

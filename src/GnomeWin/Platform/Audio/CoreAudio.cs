@@ -91,6 +91,10 @@ public sealed class AudioController : IDisposable
 
     public bool IsAvailable => _volume != null;
 
+    public string? DeviceName { get; private set; }
+
+    private static readonly PROPERTYKEY PKEY_Device_FriendlyName = new(new Guid("a45c254e-df1c-4efd-8020-67d146a850e0"), 14);
+
     private void BindDefaultDevice()
     {
         if (_volume != null)
@@ -103,6 +107,16 @@ public sealed class AudioController : IDisposable
         if (_enumerator.GetDefaultAudioEndpoint(eRender, eMultimedia, out IMMDevice device) != 0 || device == null) return;
         try
         {
+            if (device.OpenPropertyStore(0, out IntPtr ps) == 0 && ps != IntPtr.Zero)
+            {
+                try
+                {
+                    var store = (IPropertyStore)Marshal.GetObjectForIUnknown(ps);
+                    DeviceName = ShellApi.GetStringProperty(store, PKEY_Device_FriendlyName);
+                    Marshal.ReleaseComObject(store);
+                }
+                finally { Marshal.Release(ps); }
+            }
             Guid iid = IID_IAudioEndpointVolume;
             if (device.Activate(ref iid, (int)NativeMethods.CLSCTX_ALL, IntPtr.Zero, out object o) == 0)
             {

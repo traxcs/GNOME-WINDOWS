@@ -18,7 +18,8 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
-                        <Border x:Name="Bd" Background="{TemplateBinding Background}" CornerRadius="999" Padding="{TemplateBinding Padding}">
+                        <!-- Radius = half the button height (26 px): a real pill, not an ellipse -->
+                        <Border x:Name="Bd" Background="{TemplateBinding Background}" CornerRadius="13" Padding="{TemplateBinding Padding}">
                             <ContentPresenter VerticalAlignment="Center" HorizontalAlignment="Center" />
                         </Border>
                         <ControlTemplate.Triggers>
@@ -60,7 +61,7 @@
         </StackPanel>
 
         <!-- GNOME hot corner: 3x3 px in the top-left corner of the screen -->
-        <Border x:Name="HotCornerZone" Width="3" Height="3" HorizontalAlignment="Left" VerticalAlignment="Top"
+        <Border x:Name="HotCornerZone" Width="2" Height="2" HorizontalAlignment="Left" VerticalAlignment="Top"
                 Background="#01000000" Panel.ZIndex="10" />
 
         <!-- Clock / calendar / notifications -->
@@ -72,14 +73,13 @@
             </StackPanel>
         </Button>
 
-        <!-- System status: network, volume, battery, power -->
+        <!-- System status (GNOME): network (Wi-Fi or wired), volume, battery on laptops -->
         <Button x:Name="StatusButton" Grid.Column="2" Style="{StaticResource PanelButton}" HorizontalAlignment="Right" Margin="0,3,6,3">
             <StackPanel Orientation="Horizontal">
                 <TextBlock x:Name="NetworkGlyph" Style="{StaticResource PanelGlyph}" Text="&#xE701;" />
                 <TextBlock x:Name="VolumeGlyph" Style="{StaticResource PanelGlyph}" Text="&#xE767;" />
                 <TextBlock x:Name="BatteryGlyph" Style="{StaticResource PanelGlyph}" Text="&#xEBAA;" Visibility="Collapsed" />
                 <TextBlock x:Name="BatteryText" VerticalAlignment="Center" FontSize="13" Margin="0,0,4,0" Visibility="Collapsed" />
-                <TextBlock Style="{StaticResource PanelGlyph}" Text="&#xE7E8;" FontSize="13" />
             </StackPanel>
         </Button>
     </Grid>

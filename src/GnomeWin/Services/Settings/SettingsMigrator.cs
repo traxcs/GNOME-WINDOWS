@@ -34,6 +34,22 @@ public sealed class SettingsMigrator
             general["Style"] ??= ubuntuDock ? "Ubuntu" : "Gnome";
             if ((string?)general["Accent"] == "Orange" && ubuntuDock) general["Accent"] = "Default";
         });
+        m.Register(4, root =>
+        {
+            if (root["Dock"] is not JsonObject dock || dock["PinnedApps"] is not JsonArray pins) return;
+            var oldDefaults = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            {
+                "Microsoft.Windows.Explorer", "MSEdge", "Microsoft.WindowsTerminal_8wekyb3d8bbwe!App",
+                "Microsoft.WindowsNotepad_8wekyb3d8bbwe!App",
+                "windows.immersivecontrolpanel_cw5n1h2txyewy!microsoft.windows.immersivecontrolpanel",
+            };
+            var current = pins.Select(p => (string?)p).OfType<string>().ToList();
+            bool untouchedDefaults = current.Count >= oldDefaults.Count && current.Take(oldDefaults.Count).All(oldDefaults.Contains);
+            if (!untouchedDefaults) return;
+            var kept = new JsonArray();
+            foreach (var p in current.Skip(oldDefaults.Count)) kept.Add(p);
+            dock["PinnedApps"] = kept;
+        });
         return m;
     }
 

@@ -273,7 +273,8 @@ public class SettingsTests
     {
         var s = new AppSettings();
         Assert.Equal(DesignStyle.Gnome, s.General.Style);
-        Assert.Equal(DockVisibility.OverviewOnly, s.Dock.Visibility);
+        Assert.Equal(DockVisibility.AlwaysVisible, s.Dock.Visibility);
+        Assert.Equal(DockPosition.Bottom, s.Dock.Position);
         Assert.True(s.Overview.HotCorner);
     }
 

@@ -110,7 +110,9 @@ public sealed class OverviewWindow : ShellWindow
     {
         Monitor = monitor;
         var b = monitor.Bounds;
-        _physical = new RECT(b.Left + insets.Left, b.Top + insets.Top, b.Right - insets.Right, b.Bottom - insets.Bottom);
+        _physical = new RECT(b.Left, b.Top + insets.Top, b.Right, b.Bottom);
+        double s = Math.Max(0.5, monitor.Scale);
+        _content.Margin = new Thickness(insets.Left / s, 0, insets.Right / s, insets.Bottom / s);
         EnsureHandle();
         PlacePhysical(_physical);
     }

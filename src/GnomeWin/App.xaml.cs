@@ -49,6 +49,7 @@ public partial class App : Application
             _settings = new SettingsService(AppPaths.SettingsFile);
             _settings.Load();
             if (_settings.Current.General.VerboseLogging) Log.MinimumLevel = LogLevel.Debug;
+            GnomeWin.UI.Components.ShellWindow.SoftwareRenderingEnabled = _settings.Current.General.LowMemoryMode;
             if (_settings.Current.General.LowMemoryMode)
                 System.Windows.Media.RenderOptions.ProcessRenderMode = System.Windows.Interop.RenderMode.SoftwareOnly;
             bool safe = _options.SafeMode || forceSafe;

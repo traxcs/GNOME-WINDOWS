@@ -17,7 +17,7 @@ public enum DesignStyle { Gnome, Ubuntu, PopOS }
 
 public sealed class AppSettings
 {
-    public const int CurrentVersion = 4;
+    public const int CurrentVersion = 5;
 
     public int Version { get; set; } = CurrentVersion;
     public GeneralSettings General { get; set; } = new();
@@ -48,6 +48,8 @@ public sealed class GeneralSettings : ObservableObject
     private bool _lowMemory = true;
     private AccentColor _accent = AccentColor.Default;
     private DesignStyle _style = DesignStyle.Gnome;
+    private bool _showBatteryIcon = true;
+    private bool _showBatteryPercentage;
 
     public bool LaunchAtStartup { get => _launchAtStartup; set => Set(ref _launchAtStartup, value); }
     public ThemeMode Theme { get => _theme; set => Set(ref _theme, value); }
@@ -61,6 +63,8 @@ public sealed class GeneralSettings : ObservableObject
     public bool FirstRunDone { get => _firstRunDone; set => Set(ref _firstRunDone, value); }
     public bool VerboseLogging { get => _verboseLogging; set => Set(ref _verboseLogging, value); }
     public bool LowMemoryMode { get => _lowMemory; set => Set(ref _lowMemory, value); }
+    public bool ShowBatteryIcon { get => _showBatteryIcon; set => Set(ref _showBatteryIcon, value); }
+    public bool ShowBatteryPercentage { get => _showBatteryPercentage; set => Set(ref _showBatteryPercentage, value); }
 }
 
 public sealed class DockSettings : ObservableObject
@@ -68,23 +72,18 @@ public sealed class DockSettings : ObservableObject
     private DockPosition _position = DockPosition.Bottom;
     private int _iconSize = 40;
     private double _opacity = 0.85;
-    private DockVisibility _visibility = DockVisibility.OverviewOnly;
+    private DockVisibility _visibility = DockVisibility.AlwaysVisible;
     private DockHoverEffect _hover = DockHoverEffect.Highlight;
     private bool _extended;
     private DockActiveClick _activeClick = DockActiveClick.Minimize;
     private bool _isolateWorkspaces;
     private bool _showAppsButton = true;
-    private List<string> _pinned = new()
-    {
-        "Microsoft.Windows.Explorer",
-        "MSEdge",
-        "Microsoft.WindowsTerminal_8wekyb3d8bbwe!App",
-        "Microsoft.WindowsNotepad_8wekyb3d8bbwe!App",
-        "windows.immersivecontrolpanel_cw5n1h2txyewy!microsoft.windows.immersivecontrolpanel",
-    };
+    private bool _centerIcons = true;
+    private List<string> _pinned = new();
 
     public DockPosition Position { get => _position; set => Set(ref _position, value); }
     public bool Extended { get => _extended; set => Set(ref _extended, value); }
+    public bool CenterIcons { get => _centerIcons; set => Set(ref _centerIcons, value); }
     public int IconSize { get => _iconSize; set => Set(ref _iconSize, Math.Clamp(value, 24, 96)); }
     public double BackgroundOpacity { get => _opacity; set => Set(ref _opacity, Math.Clamp(value, 0, 1)); }
     public DockVisibility Visibility { get => _visibility; set => Set(ref _visibility, value); }
@@ -93,6 +92,7 @@ public sealed class DockSettings : ObservableObject
     public bool IsolateWorkspaces { get => _isolateWorkspaces; set => Set(ref _isolateWorkspaces, value); }
     public bool ShowAppsButton { get => _showAppsButton; set => Set(ref _showAppsButton, value); }
     public List<string> PinnedApps { get => _pinned; set => Set(ref _pinned, value ?? new()); }
+    public bool TaskbarPinsImported { get; set; }
 }
 
 public sealed class OverviewSettings : ObservableObject

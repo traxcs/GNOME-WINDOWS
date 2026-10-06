@@ -121,6 +121,8 @@ public sealed class ShellMessageWindow : IDisposable
     {
         IntPtr hwnd = FindWindow(null, Watchdog.MessageWindowTitle);
         if (hwnd == IntPtr.Zero) return false;
+        GetWindowThreadProcessId(hwnd, out uint pid);
+        if (pid != 0) AllowSetForegroundWindow((int)pid);
         IntPtr buffer = Marshal.StringToHGlobalUni(command + "\0");
         try
         {
