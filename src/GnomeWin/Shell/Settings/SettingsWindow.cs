@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
@@ -95,7 +95,13 @@ public sealed class SettingsWindow : Window
         RefreshSidebar(string.Empty);
         ShowPanel("appearance");
 
-        SourceInitialized += (_, _) => { if (UI.Components.ShellWindow.SoftwareRenderingEnabled) UI.Components.ShellWindow.UseSoftwareRendering(this); ApplyTitleBarTheme(); };
+        SourceInitialized += (_, _) =>
+        {
+            if (UI.Components.ShellWindow.SoftwareRenderingEnabled) UI.Components.ShellWindow.UseSoftwareRendering(this);
+            // Without its own identity the window is grouped with the executable's other windows (the console).
+            ShellApi.SetWindowAumid(new WindowInteropHelper(this).Handle, App.SettingsAppId);
+            ApplyTitleBarTheme();
+        };
         ThemeManager.ThemeChanged += ApplyTitleBarTheme;
         Closed += (_, _) => { ThemeManager.ThemeChanged -= ApplyTitleBarTheme; _hook?.CancelCapture(); };
         PreviewKeyDown += (_, e) =>

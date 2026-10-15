@@ -1,4 +1,4 @@
-using System.Windows.Media;
+﻿using System.Windows.Media;
 using GnomeWin.Services.Settings;
 
 namespace GnomeWin.Core;
@@ -13,6 +13,7 @@ public sealed class AppEntry : ObservableObject
     public bool IdIsAumid { get; init; }
     public bool IsTransient { get; init; }
     public string? Description { get; set; }
+    public string? LaunchArguments { get; init; }
 
     public ImageSource? Icon { get => _icon; set => Set(ref _icon, value); }
 

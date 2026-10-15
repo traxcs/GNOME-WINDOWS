@@ -1,4 +1,4 @@
-using System.Windows;
+﻿using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
@@ -118,6 +118,7 @@ public sealed class ConsoleWindow : Window
         SourceInitialized += (_, _) =>
         {
             if (UI.Components.ShellWindow.SoftwareRenderingEnabled) UI.Components.ShellWindow.UseSoftwareRendering(this);
+            ShellApi.SetWindowAumid(new WindowInteropHelper(this).Handle, App.ConsoleAppId);
             ApplyTitleBar();
         };
         PreviewKeyDown += OnPreviewKeyDown;

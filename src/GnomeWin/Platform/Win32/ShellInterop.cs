@@ -1,4 +1,4 @@
-using System.Runtime.InteropServices;
+﻿using System.Runtime.InteropServices;
 using System.Text;
 
 namespace GnomeWin.Platform.Win32;
@@ -116,6 +116,28 @@ public static class ShellApi
         if (store.GetValue(ref key, out PROPVARIANT pv) != 0) return null;
         try { return pv.GetString(); }
         finally { NativeMethods.PropVariantClear(ref pv); }
+    }
+
+    /// <summary>Tags a window with its own AUMID so the shell groups it under the right app instead of the host executable.</summary>
+    public static void SetWindowAumid(IntPtr hwnd, string aumid)
+    {
+        try
+        {
+            Guid iid = IID_IPropertyStore;
+            if (NativeMethods.SHGetPropertyStoreForWindow(hwnd, ref iid, out IPropertyStore store) != 0 || store == null) return;
+            try
+            {
+                var key = PKEY_AppUserModel_ID;
+                var pv = new PROPVARIANT { vt = 31, p = Marshal.StringToCoTaskMemUni(aumid) };
+                try
+                {
+                    if (store.SetValue(ref key, ref pv) == 0) store.Commit();
+                }
+                finally { NativeMethods.PropVariantClear(ref pv); }
+            }
+            finally { Marshal.ReleaseComObject(store); }
+        }
+        catch { /* the shell refuses the property store for some windows */ }
     }
 
     public static string? GetWindowAumid(IntPtr hwnd)

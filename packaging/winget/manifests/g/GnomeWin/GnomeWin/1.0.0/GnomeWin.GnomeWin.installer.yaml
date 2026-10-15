@@ -17,7 +17,6 @@ AppsAndFeaturesEntries:
   - DisplayName: GnomeWin
     Publisher: GnomeWin
     ProductCode: GnomeWin
-    DisplayVersion: 1.0.0
 Installers:
   - Architecture: x64
     InstallerUrl: https://github.com/traxcs/GNOME-WINDOWS/releases/download/v1.0.0/GnomeWin-Setup.exe

@@ -1,4 +1,4 @@
-using System.Windows;
+﻿using System.Windows;
 using System.Windows.Threading;
 using GnomeWin.Platform.Taskbar;
 using GnomeWin.Services;
@@ -76,6 +76,7 @@ public partial class App : Application
     private static extern int SetCurrentProcessExplicitAppUserModelID(string appId);
 
     public const string ConsoleAppId = "GnomeWin.Console";
+    public const string SettingsAppId = "GnomeWin.Settings";
 
     private void StartConsole()
     {

@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Windows.Threading;
 using GnomeWin.Platform.Win32;
 using GnomeWin.Services.Logging;
@@ -134,6 +134,9 @@ public sealed class ApplicationManager
     public AppEntry? Resolve(WindowInfo w)
     {
         if (w.Aumid != null && _byId.TryGetValue(w.Aumid, out var byAumid)) return byAumid;
+        // Our own windows (settings, console) share one executable, so the exe fallback below would
+        // give them all the icon of whichever GnomeWin shortcut the catalogue indexed first.
+        if (w.Aumid != null && ShellApps.Find(w.Aumid) is { } own) return own;
         if (w.ProcessPath != null)
         {
             if (_byExe.TryGetValue(w.ProcessPath, out var byExe)) return byExe;
@@ -271,6 +274,7 @@ public sealed class ApplicationManager
         try
         {
             var psi = new ProcessStartInfo(app.LaunchTarget) { UseShellExecute = true };
+            if (!string.IsNullOrEmpty(app.LaunchArguments)) psi.Arguments = app.LaunchArguments;
             if (app.IsTransient && app.ExePath != null) psi.WorkingDirectory = Path.GetDirectoryName(app.ExePath) ?? string.Empty;
             if (asAdmin) psi.Verb = "runas";
             Process.Start(psi)?.Dispose();

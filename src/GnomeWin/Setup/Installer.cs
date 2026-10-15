@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using Microsoft.Win32;
 using GnomeWin.Platform.Startup;
 using GnomeWin.Platform.Taskbar;
@@ -63,7 +63,7 @@ public static class Installer
         ShortcutHelper.Create(Path.Combine(StartMenuDir, "GnomeWin.lnk"), InstalledExe, "", "GNOME Shell experience for Windows");
         ShortcutHelper.Create(Path.Combine(StartMenuDir, Text("GnomeWin (mode sans échec).lnk", "GnomeWin (safe mode).lnk")), InstalledExe, "--safe-mode", "GnomeWin safe mode");
         ShortcutHelper.Create(Path.Combine(StartMenuDir, Text("Paramètres GnomeWin.lnk", "GnomeWin Settings.lnk")), InstalledExe, "--settings", "GnomeWin settings",
-            null, null, ExtractIcon("Settings.ico"));
+            null, App.SettingsAppId, ExtractIcon("Settings.ico"));
         ShortcutHelper.Create(Path.Combine(StartMenuDir, "Console.lnk"), InstalledExe, "--terminal", Text("Terminal (PowerShell et cmd)", "Terminal (PowerShell and cmd)"),
             Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), App.ConsoleAppId, ExtractIcon("Console.ico"));
         ShortcutHelper.Create(Path.Combine(StartMenuDir, Text("Restaurer la barre des tâches Windows.lnk", "Restore the Windows taskbar.lnk")), InstalledExe, "--restore", "Quit GnomeWin and restore the Windows taskbar");
