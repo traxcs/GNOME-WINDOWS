@@ -98,7 +98,6 @@ public sealed class SettingsWindow : Window
         SourceInitialized += (_, _) =>
         {
             if (UI.Components.ShellWindow.SoftwareRenderingEnabled) UI.Components.ShellWindow.UseSoftwareRendering(this);
-            // Without its own identity the window is grouped with the executable's other windows (the console).
             ShellApi.SetWindowAumid(new WindowInteropHelper(this).Handle, App.SettingsAppId);
             ApplyTitleBarTheme();
         };

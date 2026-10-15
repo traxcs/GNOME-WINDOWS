@@ -118,7 +118,6 @@ public static class ShellApi
         finally { NativeMethods.PropVariantClear(ref pv); }
     }
 
-    /// <summary>Tags a window with its own AUMID so the shell groups it under the right app instead of the host executable.</summary>
     public static void SetWindowAumid(IntPtr hwnd, string aumid)
     {
         try

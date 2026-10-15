@@ -3,10 +3,6 @@ using GnomeWin.UI;
 
 namespace GnomeWin.Core;
 
-/// <summary>
-/// GnomeWin's own windows (settings, console) all run from the same executable, so the shell cannot tell
-/// them apart by process path: each one tags its window with an AUMID and gets its entry — and its icon — here.
-/// </summary>
 public static class ShellApps
 {
     private static readonly Dictionary<string, AppEntry> Cache = new(StringComparer.OrdinalIgnoreCase);

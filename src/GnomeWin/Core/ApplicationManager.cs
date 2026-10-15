@@ -134,8 +134,6 @@ public sealed class ApplicationManager
     public AppEntry? Resolve(WindowInfo w)
     {
         if (w.Aumid != null && _byId.TryGetValue(w.Aumid, out var byAumid)) return byAumid;
-        // Our own windows (settings, console) share one executable, so the exe fallback below would
-        // give them all the icon of whichever GnomeWin shortcut the catalogue indexed first.
         if (w.Aumid != null && ShellApps.Find(w.Aumid) is { } own) return own;
         if (w.ProcessPath != null)
         {
