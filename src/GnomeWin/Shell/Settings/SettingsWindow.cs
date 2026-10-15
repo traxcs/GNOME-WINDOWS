@@ -883,6 +883,7 @@ public sealed class SettingsWindow : Window
                 remove.SetResourceReference(StyleProperty, "RoundIconButton");
                 remove.Click += (_, _) => { _apps.Unpin(id); ShowPanelContent("apps"); };
                 var icon = new Image { Source = app.Icon, Width = 28, Height = 28 };
+                RenderOptions.SetBitmapScalingMode(icon, BitmapScalingMode.HighQuality);
                 rows.Add(RowShell(app.Name, null, remove, icon));
             }
         }

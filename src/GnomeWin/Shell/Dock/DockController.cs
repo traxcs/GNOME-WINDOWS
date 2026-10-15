@@ -5,6 +5,7 @@ using System.Windows.Media;
 using System.Windows.Threading;
 using GnomeWin.Core;
 using GnomeWin.Platform.Win32;
+using GnomeWin.Services.AppDiscovery;
 using GnomeWin.Services.Logging;
 using GnomeWin.Services.Settings;
 using GnomeWin.UI;
@@ -89,7 +90,34 @@ public sealed class DockController : IDisposable
             else Items.Insert(i, target[i]);
         }
         while (Items.Count > target.Count) Items.RemoveAt(Items.Count - 1);
+        RefreshIcons();
         ScheduleVisibility();
+    }
+
+    /// <summary>
+    /// Asks the shell for each icon at the size the dock actually draws it, so nothing is resampled
+    /// between the catalogue size and the dock's.
+    /// </summary>
+    private void RefreshIcons()
+    {
+        double scale = _monitors.Monitors.Count > 0 ? _monitors.Monitors.Max(m => m.Scale) : 1;
+        int px = (int)Math.Clamp(Math.Ceiling(_settings.Current.Dock.IconSize * Math.Max(1, scale)), 16, 256);
+        var wanted = new List<(string Id, string? ExePath)>();
+        foreach (var item in Items)
+        {
+            if (item.App == null || item.IconPixelSize == px) continue;
+            item.IconPixelSize = px;
+            var cached = AppIconCache.Peek(item.App.Id, px);
+            if (cached != null) item.SizedIcon = cached;
+            else wanted.Add((item.App.Id, item.App.ExePath));
+        }
+        if (wanted.Count == 0) return;
+        AppIconCache.LoadAsync(wanted, px, Application.Current?.Dispatcher ?? Dispatcher.CurrentDispatcher, (id, icon) =>
+        {
+            foreach (var item in Items)
+                if (string.Equals(item.App?.Id, id, StringComparison.OrdinalIgnoreCase) && item.IconPixelSize == px)
+                    item.SizedIcon = icon;
+        });
     }
 
     private void OnAppLaunched(AppEntry app)
@@ -132,6 +160,8 @@ public sealed class DockController : IDisposable
 
     public void RefreshTheme()
     {
+        foreach (var item in Items) item.IconPixelSize = 0;
+        RefreshIcons();
         foreach (var d in _docks.Values) ApplyViewSettings(d.View);
         ViewSettingsChanged?.Invoke();
     }
@@ -425,6 +455,11 @@ public sealed class DockController : IDisposable
         {
             if (property is nameof(DockSettings.PinnedApps) or nameof(DockSettings.ShowAppsButton) or nameof(DockSettings.IsolateWorkspaces) or "*")
                 ScheduleRebuild();
+            if (property is nameof(DockSettings.IconSize) or "*")
+            {
+                foreach (var item in Items) item.IconPixelSize = 0;
+                RefreshIcons();
+            }
             SyncWindows();
             ViewSettingsChanged?.Invoke();
         }

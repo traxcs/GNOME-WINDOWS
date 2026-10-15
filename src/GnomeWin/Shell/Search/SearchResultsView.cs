@@ -115,7 +115,9 @@ public sealed class SearchResultsView : Grid
     private Border Tile(SearchResult r)
     {
         var stack = new StackPanel { Width = 104 };
-        stack.Children.Add(new Image { Source = r.Icon, Width = 56, Height = 56, Margin = new Thickness(0, 8, 0, 6) });
+        var tileIcon = new Image { Source = r.Icon, Width = 56, Height = 56, Margin = new Thickness(0, 8, 0, 6) };
+        RenderOptions.SetBitmapScalingMode(tileIcon, BitmapScalingMode.HighQuality);
+        stack.Children.Add(tileIcon);
         var t = new TextBlock { Text = r.Title, TextAlignment = TextAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis, TextWrapping = TextWrapping.Wrap, MaxHeight = 34, FontSize = 12.5 };
         t.SetResourceReference(TextBlock.ForegroundProperty, "Brush.OverviewFg");
         stack.Children.Add(t);
@@ -127,7 +129,12 @@ public sealed class SearchResultsView : Grid
         var g = new Grid();
         g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(34) });
         g.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        if (r.Icon != null) g.Children.Add(new Image { Source = r.Icon, Width = 24, Height = 24, VerticalAlignment = VerticalAlignment.Center });
+        if (r.Icon != null)
+        {
+            var rowIcon = new Image { Source = r.Icon, Width = 24, Height = 24, VerticalAlignment = VerticalAlignment.Center };
+            RenderOptions.SetBitmapScalingMode(rowIcon, BitmapScalingMode.HighQuality);
+            g.Children.Add(rowIcon);
+        }
         else
         {
             var glyph = new TextBlock { Text = r.Glyph ?? "", FontSize = 17, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };

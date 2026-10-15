@@ -94,8 +94,7 @@ public sealed class ShellHost : IDisposable
         _workspaces = new WorkspaceManager(_desktops, _windows, _settings);
         _fullscreen = new FullscreenDetector(_monitors);
 
-        double maxScale = _monitors.Monitors.Max(m => m.Scale);
-        int iconPx = (int)Math.Clamp(Math.Ceiling(64 * maxScale), 64, 256);
+        int iconPx = CatalogIconPixels();
         _apps.IconPixelSize = iconPx;
 
         _windows.Start();
@@ -623,8 +622,22 @@ public sealed class ShellHost : IDisposable
         _displayDebounce.Start();
     }
 
+    /// <summary>The app grid draws its icons at 64 DIP: the catalogue follows the sharpest monitor.</summary>
+    private int CatalogIconPixels()
+    {
+        double maxScale = _monitors.Monitors.Count > 0 ? _monitors.Monitors.Max(m => m.Scale) : 1;
+        return (int)Math.Clamp(Math.Ceiling(64 * Math.Max(1, maxScale)), 64, 256);
+    }
+
     private void OnMonitorsChanged()
     {
+        int iconPx = CatalogIconPixels();
+        if (iconPx > _apps.IconPixelSize)
+        {
+            // A sharper monitor arrived: the icons we have would be stretched on it.
+            _apps.IconPixelSize = iconPx;
+            _discovery.Scan(iconPx);
+        }
         _wallpapers.Invalidate();
         if (_overview.IsOpen) _overview.Close(null);
         SyncTopBars();

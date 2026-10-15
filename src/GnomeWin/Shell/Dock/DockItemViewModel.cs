@@ -10,6 +10,7 @@ public sealed class DockItemViewModel : ObservableObject
     private bool _isPinned, _isActive, _isLaunching, _isSelected, _isDropTarget, _separatorBefore;
     private int _windowCount;
     private AppEntry? _app;
+    private ImageSource? _sizedIcon;
 
     public DockItemViewModel(string id) => Id = id;
 
@@ -26,6 +27,8 @@ public sealed class DockItemViewModel : ObservableObject
             if (_app != null) _app.PropertyChanged -= OnAppChanged;
             _app = value;
             if (_app != null) _app.PropertyChanged += OnAppChanged;
+            _sizedIcon = null;
+            IconPixelSize = 0;
             OnPropertyChanged();
             OnPropertyChanged(nameof(Icon));
             OnPropertyChanged(nameof(Name));
@@ -38,8 +41,18 @@ public sealed class DockItemViewModel : ObservableObject
     }
 
     public string Name => IsShowApps ? UI.Loc.T("ShowApplications") : App?.Name ?? Id;
-    public ImageSource? Icon => App?.Icon ?? FallbackIcon;
+    /// <summary>The catalogue icon is built for the app grid; the dock draws at its own size.</summary>
+    public ImageSource? Icon => _sizedIcon ?? App?.Icon ?? FallbackIcon;
     public ImageSource? FallbackIcon { get; set; }
+
+    /// <summary>Size, in device pixels, the icon in <see cref="SizedIcon"/> was rendered for.</summary>
+    public int IconPixelSize { get; set; }
+
+    public ImageSource? SizedIcon
+    {
+        get => _sizedIcon;
+        set { if (!ReferenceEquals(_sizedIcon, value)) { _sizedIcon = value; OnPropertyChanged(nameof(Icon)); } }
+    }
 
     public List<WindowInfo> Windows { get; private set; } = new();
 
