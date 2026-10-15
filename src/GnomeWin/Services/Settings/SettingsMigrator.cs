@@ -58,7 +58,6 @@ public sealed class SettingsMigrator
         });
         m.Register(6, root =>
         {
-            // Centring was on by default; the icons start at the edge again, as in Ubuntu's dock.
             var dock = root["Dock"] as JsonObject ?? new JsonObject();
             root["Dock"] = dock;
             dock["CenterIcons"] = false;

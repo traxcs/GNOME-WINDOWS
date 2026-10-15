@@ -5,10 +5,6 @@ using GnomeWin.Services.Logging;
 
 namespace GnomeWin.Services.AppDiscovery;
 
-/// <summary>
-/// Icons at an exact pixel size, so a surface that does not draw at the catalogue's size — the dock,
-/// whose icon size is a setting — shows the icon the shell has for that size instead of a resampled one.
-/// </summary>
 public static class AppIconCache
 {
     private static readonly Dictionary<string, ImageSource> Cache = new(StringComparer.OrdinalIgnoreCase);
@@ -18,10 +14,6 @@ public static class AppIconCache
         lock (Cache) return Cache.TryGetValue(Key(appId, px), out var icon) ? icon : null;
     }
 
-    /// <summary>
-    /// Loads the icons of <paramref name="apps"/> at <paramref name="px"/> on a shell (STA) worker and
-    /// reports each one on <paramref name="ui"/> as it arrives.
-    /// </summary>
     public static void LoadAsync(IReadOnlyList<(string Id, string? ExePath)> apps, int px, Dispatcher ui, Action<string, ImageSource> loaded)
     {
         var pending = new List<(string Id, string? ExePath)>();

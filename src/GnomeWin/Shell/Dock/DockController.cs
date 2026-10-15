@@ -94,10 +94,6 @@ public sealed class DockController : IDisposable
         ScheduleVisibility();
     }
 
-    /// <summary>
-    /// Asks the shell for each icon at the size the dock actually draws it, so nothing is resampled
-    /// between the catalogue size and the dock's.
-    /// </summary>
     private void RefreshIcons()
     {
         double scale = _monitors.Monitors.Count > 0 ? _monitors.Monitors.Max(m => m.Scale) : 1;

@@ -9,10 +9,6 @@ namespace GnomeWin.Services.Updates;
 
 public sealed record UpdateInfo(Version Version, string Tag, string Name, string Notes, string PageUrl, string DownloadUrl, long Size);
 
-/// <summary>
-/// Looks for a newer GnomeWin release on GitHub and installs it with the published setup, which stops
-/// the running shell, replaces the files and starts it again.
-/// </summary>
 public sealed class UpdateService : IDisposable
 {
     public const string Repository = "traxcs/GNOME-WINDOWS";
@@ -29,7 +25,6 @@ public sealed class UpdateService : IDisposable
 
     public static Version CurrentVersion => Parse(Installer.Version) ?? new Version(0, 0);
 
-    /// <summary>Returns the latest release when it is newer than the running build, otherwise null.</summary>
     public async Task<UpdateInfo?> CheckAsync(CancellationToken token = default)
     {
         var release = await LatestReleaseAsync(token).ConfigureAwait(false);
@@ -90,7 +85,6 @@ public sealed class UpdateService : IDisposable
         }
     }
 
-    /// <summary>Downloads the setup into the cache folder and returns its path, or null when it fails.</summary>
     public async Task<string?> DownloadAsync(UpdateInfo update, IProgress<double>? progress = null, CancellationToken token = default)
     {
         string dir = Path.Combine(AppPaths.Cache, "updates");
@@ -134,9 +128,6 @@ public sealed class UpdateService : IDisposable
         }
     }
 
-    /// <summary>
-    /// Hands over to the downloaded setup: it quits this shell, replaces the installed files and starts it again.
-    /// </summary>
     public static bool Install(string setupPath)
     {
         try
@@ -171,7 +162,6 @@ public sealed class UpdateService : IDisposable
         catch (Exception ex) { Log.Debug($"Update cache cleanup failed: {ex.Message}"); }
     }
 
-    /// <summary>Reads "v1.2.3" or "1.2.3-beta" as a version, ignoring any suffix.</summary>
     public static Version? Parse(string? tag)
     {
         if (string.IsNullOrWhiteSpace(tag)) return null;

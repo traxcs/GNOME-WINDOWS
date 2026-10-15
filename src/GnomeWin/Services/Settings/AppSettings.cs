@@ -65,9 +65,7 @@ public sealed class GeneralSettings : ObservableObject
     public bool LowMemoryMode { get => _lowMemory; set => Set(ref _lowMemory, value); }
     public bool ShowBatteryIcon { get => _showBatteryIcon; set => Set(ref _showBatteryIcon, value); }
     public bool ShowBatteryPercentage { get => _showBatteryPercentage; set => Set(ref _showBatteryPercentage, value); }
-    /// <summary>Check GitHub releases and offer the new version.</summary>
     public bool AutomaticUpdates { get => _autoUpdate; set => Set(ref _autoUpdate, value); }
-    /// <summary>Tag the user turned down: it is not offered again.</summary>
     public string? SkippedUpdate { get => _skippedUpdate; set => Set(ref _skippedUpdate, value); }
 }
 

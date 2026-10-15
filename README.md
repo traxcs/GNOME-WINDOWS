@@ -74,8 +74,8 @@ L'exécutable est autonome (« self-contained ») : **aucun runtime .NET n'est r
 Les manifestes winget (installation par utilisateur, silencieuse : `--install --quiet --startup`) sont générés par :
 
 ```powershell
-.\tools\New-WingetManifest.ps1 -InstallerUrl https://github.com/traxcs/GnomeWin/releases/download/v1.0.0/GnomeWin-Setup.exe
-winget validate --manifest packaging\winget\manifests\g\GnomeWin\GnomeWin\1.0.0
+.\tools\New-WingetManifest.ps1 -InstallerUrl https://github.com/traxcs/GnomeWin/releases/download/v1.0.2/GnomeWin-Setup.exe
+winget validate --manifest packaging\winget\manifests\g\GnomeWin\GnomeWin\1.0.2
 ```
 
 winget installe depuis une URL HTTPS publique : publiez `GnomeWin-Setup.exe` (release GitHub), régénérez le
@@ -86,7 +86,7 @@ winget install GnomeWin.GnomeWin
 ```
 
 Test local avant publication : `winget settings --enable LocalManifestFiles` (admin) puis
-`winget install --manifest packaging\winget\manifests\g\GnomeWin\GnomeWin\1.0.0`.
+`winget install --manifest packaging\winget\manifests\g\GnomeWin\GnomeWin\1.0.2`.
 
 ### Version portable
 

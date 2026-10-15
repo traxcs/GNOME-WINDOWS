@@ -5,10 +5,6 @@ using WpfPath = System.Windows.Shapes.Path;
 
 namespace GnomeWin.UI.Components;
 
-/// <summary>
-/// The GNOME battery: an upright outline filled to the charge level, with a bolt while it charges.
-/// The icon font only has landscape batteries whose level is a separate glyph, so this is drawn.
-/// </summary>
 public sealed class BatteryIcon : Grid
 {
     private const double BodyWidth = 11, BodyHeight = 18, CapWidth = 5, CapHeight = 2, Inset = 1.6;
@@ -49,7 +45,6 @@ public sealed class BatteryIcon : Grid
         _level.VerticalAlignment = VerticalAlignment.Bottom;
         _level.Margin = new Thickness(0, 0, 0, Inset);
 
-        // A lightning bolt sized for the inside of the body.
         _bolt.Data = Geometry.Parse("M 6.2,0 L 1.4,6.4 L 4.4,6.4 L 3.4,11.4 L 8.4,4.6 L 5.2,4.6 Z");
         _bolt.Stretch = Stretch.Uniform;
         _bolt.Width = 7;
@@ -66,7 +61,6 @@ public sealed class BatteryIcon : Grid
         ApplyForeground();
     }
 
-    /// <summary>Colour of the outline, of the charge level and of the bolt.</summary>
     public Brush IconBrush
     {
         get => (Brush)GetValue(IconBrushProperty);
@@ -86,7 +80,6 @@ public sealed class BatteryIcon : Grid
 
         double inner = BodyHeight - Inset * 2;
         _level.Height = Math.Max(percent > 0 ? 1.5 : 0, inner * percent / 100.0);
-        // While charging the body holds the bolt instead of the level, as in GNOME.
         _bolt.Visibility = charging ? Visibility.Visible : Visibility.Collapsed;
         _level.Visibility = charging ? Visibility.Collapsed : Visibility.Visible;
         ApplyForeground();
@@ -100,7 +93,6 @@ public sealed class BatteryIcon : Grid
         var brush = IconBrush;
         _body.BorderBrush = brush;
         _cap.Background = brush;
-        // Below 15 % the level turns red, as GNOME does, so an empty battery is noticed.
         _level.Background = !_charging && _percent >= 0 && _percent <= 15
             ? new SolidColorBrush(Color.FromRgb(0xE6, 0x2D, 0x42))
             : brush;

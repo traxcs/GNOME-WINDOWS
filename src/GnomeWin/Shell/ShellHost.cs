@@ -196,7 +196,6 @@ public sealed class ShellHost : IDisposable
         ThemeManager.ThemeChanged += () => _dock.RefreshTheme();
     }
 
-    /// <summary>Looks for a new GitHub release shortly after startup, then a few times a day.</summary>
     private void ScheduleUpdateChecks()
     {
         if (_safeMode || !Installer.IsRunningFromInstallDir) return;
@@ -208,10 +207,6 @@ public sealed class ShellHost : IDisposable
         _updateTimer.Start();
     }
 
-    /// <summary>
-    /// Checks GitHub, downloads the setup and offers to install it. Returns what to tell the user,
-    /// which the settings window shows next to its button.
-    /// </summary>
     public async Task<string> CheckForUpdatesAsync(bool manual)
     {
         if (!manual && !_settings.Current.General.AutomaticUpdates) return string.Empty;
@@ -622,7 +617,6 @@ public sealed class ShellHost : IDisposable
         _displayDebounce.Start();
     }
 
-    /// <summary>The app grid draws its icons at 64 DIP: the catalogue follows the sharpest monitor.</summary>
     private int CatalogIconPixels()
     {
         double maxScale = _monitors.Monitors.Count > 0 ? _monitors.Monitors.Max(m => m.Scale) : 1;
@@ -634,7 +628,6 @@ public sealed class ShellHost : IDisposable
         int iconPx = CatalogIconPixels();
         if (iconPx > _apps.IconPixelSize)
         {
-            // A sharper monitor arrived: the icons we have would be stretched on it.
             _apps.IconPixelSize = iconPx;
             _discovery.Scan(iconPx);
         }

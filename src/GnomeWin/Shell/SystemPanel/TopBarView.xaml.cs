@@ -55,7 +55,6 @@ public partial class TopBarView : UserControl
         }
     }
 
-    /// <summary>At or under this level the percentage shows up on its own.</summary>
     private const int LowBattery = 20;
 
     public void SetStatus(SystemStatusService s, bool showBattery, bool showPercentage)
@@ -67,7 +66,6 @@ public partial class TopBarView : UserControl
         if (s.HasBattery && showBattery)
         {
             BatteryGlyph.Visibility = Visibility.Visible;
-            // The level is worth reading while it fills up or when it is nearly empty, whatever the setting.
             bool wanted = showPercentage || s.Charging || s.BatteryPercent <= LowBattery;
             BatteryText.Visibility = wanted ? Visibility.Visible : Visibility.Collapsed;
             BatteryGlyph.SetState(s.BatteryPercent, s.Charging);

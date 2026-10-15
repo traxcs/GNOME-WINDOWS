@@ -41,11 +41,9 @@ public sealed class DockItemViewModel : ObservableObject
     }
 
     public string Name => IsShowApps ? UI.Loc.T("ShowApplications") : App?.Name ?? Id;
-    /// <summary>The catalogue icon is built for the app grid; the dock draws at its own size.</summary>
     public ImageSource? Icon => _sizedIcon ?? App?.Icon ?? FallbackIcon;
     public ImageSource? FallbackIcon { get; set; }
 
-    /// <summary>Size, in device pixels, the icon in <see cref="SizedIcon"/> was rendered for.</summary>
     public int IconPixelSize { get; set; }
 
     public ImageSource? SizedIcon

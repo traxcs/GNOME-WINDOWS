@@ -335,10 +335,10 @@ public class UpdateTests
     [Fact]
     public void Only_a_higher_release_counts_as_an_update()
     {
-        var running = UpdateService.Parse("1.0.0")!;
+        var running = UpdateService.Parse("1.0.2")!;
         Assert.True(UpdateService.Parse("v1.0.1") > running);
         Assert.True(UpdateService.Parse("v1.1.0") > running);
-        Assert.False(UpdateService.Parse("v1.0.0") > running);
+        Assert.False(UpdateService.Parse("v1.0.2") > running);
         Assert.False(UpdateService.Parse("v0.9.9") > running);
     }
 

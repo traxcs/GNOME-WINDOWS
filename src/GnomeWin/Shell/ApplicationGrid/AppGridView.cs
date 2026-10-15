@@ -22,8 +22,6 @@ public sealed class AppGridView : Grid
     private const double MaxSpacing = 36;
     private const double TileWidth = 128, TileHeight = 128;
     private const double SideMargin = 60;
-    // Below that the page is too small to hold a single tile: building it there would cache a layout
-    // whose cells stay tiny once the real size arrives.
     private const double MinPageSize = 120;
 
     private readonly Grid _viewport = new() { ClipToBounds = true };
@@ -81,7 +79,6 @@ public sealed class AppGridView : Grid
                           && Math.Abs(w - _pageWidth) < 0.5 && Math.Abs(h - _pageHeight) < 0.5;
         if (sameLayout)
         {
-            // The pages are still valid, but a transform left over from an interrupted page change is not.
             ShowPage(_page, animate: false);
             return;
         }

@@ -34,7 +34,7 @@ public static class Installer
     private static bool IsSingleFile => string.IsNullOrEmpty(typeof(Installer).Assembly.Location);
 #pragma warning restore IL3000
 
-    public static string Version => FileVersionInfo.GetVersionInfo(AppPaths.ExecutablePath).ProductVersion?.Split('+')[0] ?? "1.0.0";
+    public static string Version => FileVersionInfo.GetVersionInfo(AppPaths.ExecutablePath).ProductVersion?.Split('+')[0] ?? "1.0.2";
 
     public static void Install(InstallOptions o, Action<string> progress)
     {

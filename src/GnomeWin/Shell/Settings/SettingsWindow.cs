@@ -38,7 +38,6 @@ public sealed class SettingsWindow : Window
     private readonly TextBlock _pageTitle = new();
     private readonly ScrollViewer _content = new();
 
-    /// <summary>Set by the shell: checks GitHub and returns what to show next to the button.</summary>
     public Func<Task<string>>? CheckForUpdates { get; set; }
 
     public SettingsWindow(SettingsService settings, KeyboardHookService? hook, SystemStatusService? status, ApplicationManager? apps,
