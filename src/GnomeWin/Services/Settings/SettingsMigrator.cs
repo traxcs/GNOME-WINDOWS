@@ -58,11 +58,9 @@ public sealed class SettingsMigrator
         });
         m.Register(6, root =>
         {
-            // Version 1 forced the panel mode on everyone and centring was on by default:
-            // the dock is a floating dock again unless the user turns the panel back on.
+            // Centring was on by default; the icons start at the edge again, as in Ubuntu's dock.
             var dock = root["Dock"] as JsonObject ?? new JsonObject();
             root["Dock"] = dock;
-            dock["Extended"] = false;
             dock["CenterIcons"] = false;
         });
         return m;

@@ -255,7 +255,7 @@ public class SettingsTests
         var s = doc.Deserialize<AppSettings>(SettingsService.JsonOptions)!;
         Assert.Equal(DockPosition.Left, s.Dock.Position);
         Assert.Equal(DockVisibility.AlwaysVisible, s.Dock.Visibility);
-        Assert.False(s.Dock.Extended);
+        Assert.True(s.Dock.Extended);
         Assert.False(s.Dock.CenterIcons);
         Assert.Equal(40, s.Dock.IconSize);
     }
@@ -288,7 +288,7 @@ public class SettingsTests
         Assert.Equal(DesignStyle.Gnome, s.General.Style);
         Assert.Equal(DockVisibility.AlwaysVisible, s.Dock.Visibility);
         Assert.Equal(DockPosition.Left, s.Dock.Position);
-        Assert.False(s.Dock.Extended);
+        Assert.True(s.Dock.Extended);
         Assert.False(s.Dock.CenterIcons);
         Assert.False(s.Overview.HotCorner);
     }

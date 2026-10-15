@@ -78,7 +78,7 @@ public sealed class DockSettings : ObservableObject
     private double _opacity = 0.85;
     private DockVisibility _visibility = DockVisibility.AlwaysVisible;
     private DockHoverEffect _hover = DockHoverEffect.Highlight;
-    private bool _extended;
+    private bool _extended = true;
     private DockActiveClick _activeClick = DockActiveClick.Minimize;
     private bool _isolateWorkspaces;
     private bool _showAppsButton = true;

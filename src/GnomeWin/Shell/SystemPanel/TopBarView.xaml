@@ -1,6 +1,7 @@
 <UserControl x:Class="GnomeWin.Shell.SystemPanel.TopBarView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:components="clr-namespace:GnomeWin.UI.Components"
              xmlns:ui="clr-namespace:GnomeWin.UI"
              Height="32" Background="{DynamicResource Brush.PanelBg}" Focusable="False"
              TextOptions.TextFormattingMode="Display">
@@ -78,8 +79,8 @@
             <StackPanel Orientation="Horizontal">
                 <TextBlock x:Name="NetworkGlyph" Style="{StaticResource PanelGlyph}" Text="&#xE701;" />
                 <TextBlock x:Name="VolumeGlyph" Style="{StaticResource PanelGlyph}" Text="&#xE767;" />
-                <TextBlock x:Name="BatteryGlyph" Style="{StaticResource PanelGlyph}" Text="&#xEBAA;" Visibility="Collapsed" />
-                <TextBlock x:Name="BatteryText" VerticalAlignment="Center" FontSize="13" Margin="0,0,4,0" Visibility="Collapsed" />
+                <components:BatteryIcon x:Name="BatteryGlyph" IconBrush="{DynamicResource Brush.PanelFg}" Margin="2,0,2,0" Visibility="Collapsed" />
+                <TextBlock x:Name="BatteryText" VerticalAlignment="Center" FontSize="13" Margin="2,0,4,0" Visibility="Collapsed" />
             </StackPanel>
         </Button>
     </Grid>

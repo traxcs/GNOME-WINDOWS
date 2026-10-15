@@ -28,7 +28,7 @@ public sealed class QuickSettingsWindow : PopupPanelWindow
     private readonly QuickToggle _power, _night, _dark, _dnd, _airplane;
     private readonly Border _batteryPill;
     private readonly TextBlock _batteryText = new() { VerticalAlignment = VerticalAlignment.Center, FontSize = 13, FontWeight = FontWeights.SemiBold, Margin = new Thickness(6, 0, 0, 0) };
-    private readonly TextBlock _batteryGlyph = Glyph("", 16);
+    private readonly UI.Components.BatteryIcon _batteryIcon = new() { Margin = new Thickness(0, 0, 8, 0) };
     private readonly Border _menu = new() { Visibility = Visibility.Collapsed, CornerRadius = new CornerRadius(12), Padding = new Thickness(8), Margin = new Thickness(4, 6, 4, 0) };
     private bool _updating;
 
@@ -46,7 +46,7 @@ public sealed class QuickSettingsWindow : PopupPanelWindow
 
         var top = new DockPanel { Margin = new Thickness(2, 0, 2, 12), LastChildFill = false };
         var battery = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
-        battery.Children.Add(_batteryGlyph);
+        battery.Children.Add(_batteryIcon);
         battery.Children.Add(_batteryText);
         _batteryPill = new Border { Child = battery, Height = 38, Padding = new Thickness(14, 0, 16, 0), CornerRadius = new CornerRadius(19), Cursor = Cursors.Hand };
         _batteryPill.SetResourceReference(Border.BackgroundProperty, "Brush.CardBg");
@@ -166,8 +166,10 @@ public sealed class QuickSettingsWindow : PopupPanelWindow
             _dark.IsChecked = !ThemeManager.SystemAppsUseLightTheme();
 
             _batteryPill.Visibility = _status.HasBattery ? Visibility.Visible : Visibility.Collapsed;
-            _batteryGlyph.Text = StatusGlyphs.Battery(_status.BatteryPercent, _status.Charging);
-            _batteryText.Text = $"{_status.BatteryPercent} %";
+            _batteryIcon.SetState(_status.BatteryPercent, _status.Charging);
+            _batteryText.Text = _status.Charging
+                ? $"{_status.BatteryPercent} %" + (Loc.IsFrench ? " — en charge" : " — charging")
+                : $"{_status.BatteryPercent} %";
         }
         finally { _updating = false; }
     }

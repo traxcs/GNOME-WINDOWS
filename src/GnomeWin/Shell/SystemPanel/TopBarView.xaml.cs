@@ -55,6 +55,9 @@ public partial class TopBarView : UserControl
         }
     }
 
+    /// <summary>At or under this level the percentage shows up on its own.</summary>
+    private const int LowBattery = 20;
+
     public void SetStatus(SystemStatusService s, bool showBattery, bool showPercentage)
     {
         NetworkGlyph.Text = StatusGlyphs.Network(s.Network, s.SignalBars);
@@ -64,9 +67,14 @@ public partial class TopBarView : UserControl
         if (s.HasBattery && showBattery)
         {
             BatteryGlyph.Visibility = Visibility.Visible;
-            BatteryText.Visibility = showPercentage ? Visibility.Visible : Visibility.Collapsed;
-            BatteryGlyph.Text = StatusGlyphs.Battery(s.BatteryPercent, s.Charging);
+            // The level is worth reading while it fills up or when it is nearly empty, whatever the setting.
+            bool wanted = showPercentage || s.Charging || s.BatteryPercent <= LowBattery;
+            BatteryText.Visibility = wanted ? Visibility.Visible : Visibility.Collapsed;
+            BatteryGlyph.SetState(s.BatteryPercent, s.Charging);
             BatteryText.Text = s.BatteryPercent + " %";
+            StatusButton.ToolTip = s.Charging
+                ? Loc.IsFrench ? $"Batterie à {s.BatteryPercent} % — en charge" : $"Battery at {s.BatteryPercent}% — charging"
+                : Loc.IsFrench ? $"Batterie à {s.BatteryPercent} %" : $"Battery at {s.BatteryPercent}%";
         }
         else BatteryGlyph.Visibility = BatteryText.Visibility = Visibility.Collapsed;
     }
