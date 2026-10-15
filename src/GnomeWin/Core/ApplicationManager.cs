@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using System.Windows.Threading;
 using GnomeWin.Platform.Win32;
 using GnomeWin.Services.Logging;

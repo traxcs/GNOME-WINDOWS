@@ -6,6 +6,7 @@ using GnomeWin.Input.GlobalHotkeys;
 using GnomeWin.Input.KeyboardNavigation;
 using GnomeWin.Services.Search;
 using GnomeWin.Services.Settings;
+using GnomeWin.Services.Updates;
 using GnomeWin.Shell.Overview;
 using Xunit;
 
@@ -247,14 +248,15 @@ public class SettingsTests
     }
 
     [Fact]
-    public void Old_files_get_the_ubuntu_dock()
+    public void Old_files_get_the_left_dock()
     {
         var doc = JsonNode.Parse("""{ "Version": 1, "Dock": { "Position": "Bottom", "Visibility": "Intellihide", "IconSize": 48 } }""")!.AsObject();
         SettingsMigrator.CreateDefault().Migrate(doc, out _);
         var s = doc.Deserialize<AppSettings>(SettingsService.JsonOptions)!;
         Assert.Equal(DockPosition.Left, s.Dock.Position);
         Assert.Equal(DockVisibility.AlwaysVisible, s.Dock.Visibility);
-        Assert.True(s.Dock.Extended);
+        Assert.False(s.Dock.Extended);
+        Assert.False(s.Dock.CenterIcons);
         Assert.Equal(40, s.Dock.IconSize);
     }
 
@@ -285,7 +287,9 @@ public class SettingsTests
         var s = new AppSettings();
         Assert.Equal(DesignStyle.Gnome, s.General.Style);
         Assert.Equal(DockVisibility.AlwaysVisible, s.Dock.Visibility);
-        Assert.Equal(DockPosition.Bottom, s.Dock.Position);
+        Assert.Equal(DockPosition.Left, s.Dock.Position);
+        Assert.False(s.Dock.Extended);
+        Assert.False(s.Dock.CenterIcons);
         Assert.False(s.Overview.HotCorner);
     }
 
@@ -304,5 +308,45 @@ public class SettingsTests
         var d = new DockSettings { IconSize = 500, BackgroundOpacity = 3 };
         Assert.Equal(96, d.IconSize);
         Assert.Equal(1, d.BackgroundOpacity);
+    }
+}
+
+public class UpdateTests
+{
+    [Theory]
+    [InlineData("v1.2.3", "1.2.3.0")]
+    [InlineData("1.0.1", "1.0.1.0")]
+    [InlineData("v2.0", "2.0.0.0")]
+    [InlineData("v1.2.3-beta.1", "1.2.3.0")]
+    public void Release_tags_are_read_as_versions(string tag, string expected)
+    {
+        Assert.Equal(Version.Parse(expected), UpdateService.Parse(tag));
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("latest")]
+    [InlineData("nightly-2026-01-01")]
+    public void Tags_without_a_version_are_ignored(string tag)
+    {
+        Assert.Null(UpdateService.Parse(tag));
+    }
+
+    [Fact]
+    public void Only_a_higher_release_counts_as_an_update()
+    {
+        var running = UpdateService.Parse("1.0.0")!;
+        Assert.True(UpdateService.Parse("v1.0.1") > running);
+        Assert.True(UpdateService.Parse("v1.1.0") > running);
+        Assert.False(UpdateService.Parse("v1.0.0") > running);
+        Assert.False(UpdateService.Parse("v0.9.9") > running);
+    }
+
+    [Fact]
+    public void Automatic_updates_are_on_by_default()
+    {
+        var s = new AppSettings();
+        Assert.True(s.General.AutomaticUpdates);
+        Assert.Null(s.General.SkippedUpdate);
     }
 }

@@ -1,4 +1,4 @@
-﻿using System.Windows.Media;
+using System.Windows.Media;
 using GnomeWin.Services.Settings;
 
 namespace GnomeWin.Core;

@@ -17,7 +17,7 @@ public enum DesignStyle { Gnome, Ubuntu, PopOS }
 
 public sealed class AppSettings
 {
-    public const int CurrentVersion = 6;
+    public const int CurrentVersion = 7;
 
     public int Version { get; set; } = CurrentVersion;
     public GeneralSettings General { get; set; } = new();
@@ -48,6 +48,8 @@ public sealed class GeneralSettings : ObservableObject
     private AccentColor _accent = AccentColor.Default;
     private DesignStyle _style = DesignStyle.Gnome;
     private bool _showBatteryIcon = true;
+    private bool _autoUpdate = true;
+    private string? _skippedUpdate;
     private bool _showBatteryPercentage;
 
     public bool LaunchAtStartup { get => _launchAtStartup; set => Set(ref _launchAtStartup, value); }
@@ -63,11 +65,15 @@ public sealed class GeneralSettings : ObservableObject
     public bool LowMemoryMode { get => _lowMemory; set => Set(ref _lowMemory, value); }
     public bool ShowBatteryIcon { get => _showBatteryIcon; set => Set(ref _showBatteryIcon, value); }
     public bool ShowBatteryPercentage { get => _showBatteryPercentage; set => Set(ref _showBatteryPercentage, value); }
+    /// <summary>Check GitHub releases and offer the new version.</summary>
+    public bool AutomaticUpdates { get => _autoUpdate; set => Set(ref _autoUpdate, value); }
+    /// <summary>Tag the user turned down: it is not offered again.</summary>
+    public string? SkippedUpdate { get => _skippedUpdate; set => Set(ref _skippedUpdate, value); }
 }
 
 public sealed class DockSettings : ObservableObject
 {
-    private DockPosition _position = DockPosition.Bottom;
+    private DockPosition _position = DockPosition.Left;
     private int _iconSize = 40;
     private double _opacity = 0.85;
     private DockVisibility _visibility = DockVisibility.AlwaysVisible;
@@ -76,7 +82,7 @@ public sealed class DockSettings : ObservableObject
     private DockActiveClick _activeClick = DockActiveClick.Minimize;
     private bool _isolateWorkspaces;
     private bool _showAppsButton = true;
-    private bool _centerIcons = true;
+    private bool _centerIcons;
     private List<string> _pinned = new();
 
     public DockPosition Position { get => _position; set => Set(ref _position, value); }

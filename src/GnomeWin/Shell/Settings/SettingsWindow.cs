@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
@@ -37,6 +37,9 @@ public sealed class SettingsWindow : Window
     private readonly Border _searchHost = new();
     private readonly TextBlock _pageTitle = new();
     private readonly ScrollViewer _content = new();
+
+    /// <summary>Set by the shell: checks GitHub and returns what to show next to the button.</summary>
+    public Func<Task<string>>? CheckForUpdates { get; set; }
 
     public SettingsWindow(SettingsService settings, KeyboardHookService? hook, SystemStatusService? status, ApplicationManager? apps,
                           Func<string> diagnostics, Action restoreAndQuit)
@@ -426,7 +429,7 @@ public sealed class SettingsWindow : Window
             if (syncing) return;
             switch (c.SelectedIndex)
             {
-                case 0: d.Position = DockPosition.Bottom; d.Extended = false; break;
+                case 0: d.Position = DockPosition.Bottom; d.Extended = false; d.CenterIcons = false; break;
                 case 1: d.Position = DockPosition.Bottom; d.Extended = true; d.CenterIcons = true; break;
                 case 2: d.Position = DockPosition.Left; break;
                 case 3: d.Position = DockPosition.Right; break;
@@ -1074,6 +1077,11 @@ public sealed class SettingsWindow : Window
             Group(L("Démarrage", "Startup"), null,
                 SwitchRow(L("Lancer GnomeWin à l'ouverture de session", "Launch GnomeWin at login"), null, g, nameof(g.LaunchAtStartup)),
                 SwitchRow(L("Remplacer la barre des tâches Windows", "Replace the Windows taskbar"), L("Masquage réversible, toujours restaurée à la fermeture.", "Reversible, always restored on exit."), g, nameof(g.ReplaceTaskbar))),
+            Group(L("Mises à jour", "Updates"), null,
+                SwitchRow(L("Mises à jour automatiques", "Automatic updates"),
+                    L("Vérifie les nouvelles versions publiées sur GitHub et propose de les installer.",
+                      "Checks for new releases on GitHub and offers to install them."), g, nameof(g.AutomaticUpdates)),
+                UpdateCheckRow(version)),
             Group(L("Performances", "Performance"), null,
                 SwitchRow(L("Économie de mémoire", "Memory saver"), L("Rendu sans carte graphique : environ 70 Mo de moins, la vue d'ensemble et les applications s'ouvrent sans animation. Désactivez-le pour les animations fluides de GNOME. Prend effet au prochain démarrage.", "Software rendering: about 70 MB less, the Overview and app grid open without animation. Turn off for GNOME's smooth animations. Applies at next start."), g, nameof(g.LowMemoryMode))),
             Group(L("À propos", "About"), null,
@@ -1096,6 +1104,26 @@ public sealed class SettingsWindow : Window
                 LinkRow(L("Importer des paramètres…", "Import settings…"), null, ImportSettings, external: false),
                 ButtonRow(L("Réinitialiser les paramètres", "Reset settings"), L("Une sauvegarde est conservée.", "A backup is kept."), L("Réinitialiser", "Reset"), ResetSettings),
                 ButtonRow(L("Quitter GnomeWin", "Quit GnomeWin"), L("Réaffiche la barre des tâches Windows et ferme le shell.", "Shows the Windows taskbar again and closes the shell."), L("Quitter", "Quit"), _restoreAndQuit, destructive: true)));
+    }
+
+    private UIElement UpdateCheckRow(string version)
+    {
+        var status = new TextBlock { TextAlignment = TextAlignment.Right, TextWrapping = TextWrapping.Wrap, MaxWidth = 280, Margin = new Thickness(0, 0, 10, 0) };
+        status.SetResourceReference(TextBlock.ForegroundProperty, "Brush.FgDim");
+        var button = new Button { Content = L("Rechercher", "Check now") };
+        button.SetResourceReference(StyleProperty, "FlatButton");
+        var suffix = new StackPanel { Orientation = Orientation.Horizontal };
+        suffix.Children.Add(status);
+        suffix.Children.Add(button);
+        button.Click += async (_, _) =>
+        {
+            if (CheckForUpdates == null) return;
+            button.IsEnabled = false;
+            status.Text = L("Vérification…", "Checking…");
+            try { status.Text = await CheckForUpdates(); }
+            finally { button.IsEnabled = true; }
+        };
+        return RowShell(L("Version installée", "Installed version"), version, suffix);
     }
 
     private void ExportSettings()

@@ -20,6 +20,7 @@ public sealed class StartupOptions
     public bool Uninstall { get; set; }
     public bool Quiet { get; set; }
     public bool Startup { get; set; }
+    public bool Relaunch { get; set; }
     public string? SettingsPanel { get; set; }
     public bool Terminal { get; set; }
     public string? TerminalDirectory { get; set; }
@@ -49,6 +50,7 @@ public sealed class StartupOptions
                 case "-uninstall": o.Uninstall = true; break;
                 case "-quiet": case "-silent": o.Quiet = true; break;
                 case "-startup": o.Startup = true; break;
+                case "-relaunch": o.Relaunch = true; break;
                 case "-terminal": case "-console": o.Terminal = true; break;
                 case "-working-directory": case "-wd":
                     if (i + 1 < args.Length) { o.TerminalDirectory = args[i + 1]; i++; }
@@ -92,7 +94,8 @@ public sealed class StartupOptions
           --restore          restore the Windows taskbar (and quit the shell if running)
           --reset-settings   back up and reset the settings to defaults
           --install          install for the current user (also when the file is named GnomeWin-Setup.exe)
-          --install --quiet [--startup]   silent install (optionally launch at startup)
+          --install --quiet [--startup] [--relaunch]
+                             silent install (optionally launch at startup, or start the shell right away)
           --uninstall        uninstall (add --quiet for no UI)
           --diag             write a diagnostic report (logs folder) and print it
           --verbose          verbose logging

@@ -16,7 +16,9 @@ using GnomeWin.Services.Recovery;
 using GnomeWin.Services.Search;
 using GnomeWin.Services.Settings;
 using GnomeWin.Services.SystemStatus;
+using GnomeWin.Services.Updates;
 using GnomeWin.Services.Wallpaper;
+using GnomeWin.Setup;
 using GnomeWin.Shell.Dock;
 using GnomeWin.Shell.Overview;
 using GnomeWin.Shell.Settings;
@@ -58,6 +60,9 @@ public sealed class ShellHost : IDisposable
     private QuickSettingsWindow? _quickSettings;
     private CalendarWindow? _calendar;
     private SettingsWindow? _settingsWindow;
+    private UpdateService? _updates;
+    private DispatcherTimer? _updateTimer;
+    private bool _updateBusy;
     private Process? _watchdog;
     private int _watchdogRestarts;
     private readonly Dictionary<string, TopBarWindow> _topBars = new();
@@ -134,6 +139,7 @@ public sealed class ShellHost : IDisposable
 
         Log.Info($"Shell started in {sw.ElapsedMilliseconds} ms (safe mode: {_safeMode}, desktops: {_desktops.BackendName}).");
         ScheduleStartupCompaction();
+        ScheduleUpdateChecks();
         if (Log.MinimumLevel == LogLevel.Debug) StartStatsLogging();
 
         if (_safeMode)
@@ -190,6 +196,66 @@ public sealed class ShellHost : IDisposable
         _settings.Changed += OnSettingsChanged;
         ThemeManager.ThemeChanged += () => _dock.RefreshTheme();
     }
+
+    /// <summary>Looks for a new GitHub release shortly after startup, then a few times a day.</summary>
+    private void ScheduleUpdateChecks()
+    {
+        if (_safeMode || !Installer.IsRunningFromInstallDir) return;
+        var first = new DispatcherTimer(DispatcherPriority.ApplicationIdle) { Interval = TimeSpan.FromMinutes(2) };
+        first.Tick += (_, _) => { first.Stop(); _ = CheckForUpdatesAsync(manual: false); };
+        first.Start();
+        _updateTimer = new DispatcherTimer { Interval = TimeSpan.FromHours(6) };
+        _updateTimer.Tick += (_, _) => _ = CheckForUpdatesAsync(manual: false);
+        _updateTimer.Start();
+    }
+
+    /// <summary>
+    /// Checks GitHub, downloads the setup and offers to install it. Returns what to tell the user,
+    /// which the settings window shows next to its button.
+    /// </summary>
+    public async Task<string> CheckForUpdatesAsync(bool manual)
+    {
+        if (!manual && !_settings.Current.General.AutomaticUpdates) return string.Empty;
+        if (_updateBusy) return L("Vérification en cours…", "Checking…");
+        _updateBusy = true;
+        try
+        {
+            _updates ??= new UpdateService();
+            var update = await _updates.CheckAsync().ConfigureAwait(true);
+            if (update == null)
+                return L($"GnomeWin {Installer.Version} est à jour.", $"GnomeWin {Installer.Version} is up to date.");
+            if (!manual && string.Equals(update.Tag, _settings.Current.General.SkippedUpdate, StringComparison.OrdinalIgnoreCase))
+                return string.Empty;
+
+            string? setup = await _updates.DownloadAsync(update).ConfigureAwait(true);
+            if (setup == null)
+                return L("Le téléchargement de la mise à jour a échoué.", "The update could not be downloaded.");
+
+            string question = L($"GnomeWin {update.Version.ToString(3)} est disponible. L'installer maintenant ? GnomeWin redémarre, les autres applications restent ouvertes.",
+                                $"GnomeWin {update.Version.ToString(3)} is available. Install it now? GnomeWin restarts, your other apps stay open.");
+            if (ConfirmDialog.Ask(question, L("Installer", "Install"), _monitors.Primary))
+            {
+                if (UpdateService.Install(setup)) return L("Installation de la mise à jour…", "Installing the update…");
+                return L("La mise à jour n'a pas pu démarrer.", "The update could not be started.");
+            }
+
+            _settings.Current.General.SkippedUpdate = update.Tag;
+            _settings.Save();
+            _notifications.AddShellNotice(
+                L("Mise à jour disponible", "Update available"),
+                L($"GnomeWin {update.Version.ToString(3)} est téléchargé. Installez-le depuis Paramètres → Système.",
+                  $"GnomeWin {update.Version.ToString(3)} is downloaded. Install it from Settings → System."));
+            return L($"GnomeWin {update.Version.ToString(3)} est prêt à être installé.", $"GnomeWin {update.Version.ToString(3)} is ready to install.");
+        }
+        catch (Exception ex)
+        {
+            Log.Warn("Update check failed", ex);
+            return L("La vérification des mises à jour a échoué.", "The update check failed.");
+        }
+        finally { _updateBusy = false; }
+    }
+
+    private static string L(string fr, string en) => Loc.IsFrench ? fr : en;
 
     private void ScheduleStartupCompaction()
     {
@@ -460,7 +526,10 @@ public sealed class ShellHost : IDisposable
             WindowActions.Activate(new System.Windows.Interop.WindowInteropHelper(_settingsWindow).Handle);
             return;
         }
-        _settingsWindow = new SettingsWindow(_settings, _hook, _status, _apps, Diagnostics, () => Shutdown("user request"));
+        _settingsWindow = new SettingsWindow(_settings, _hook, _status, _apps, Diagnostics, () => Shutdown("user request"))
+        {
+            CheckForUpdates = () => CheckForUpdatesAsync(manual: true),
+        };
         _settingsWindow.Closed += (_, _) => { _settingsWindow = null; TrimSoon(); };
         _settingsWindow.Show();
         _settingsWindow.Activate();
@@ -720,6 +789,7 @@ public sealed class ShellHost : IDisposable
         Safe(() => _settingsWindow?.Close());
         Safe(() => _discovery?.Dispose());
         Safe(() => _status?.Dispose());
+        Safe(() => { _updateTimer?.Stop(); _updates?.Dispose(); });
         Safe(() => _windows?.Dispose());
         Safe(() => _desktops?.Dispose());
         Safe(() => _messages?.Dispose());

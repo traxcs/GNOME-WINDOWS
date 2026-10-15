@@ -59,6 +59,7 @@ public static class Program
         if (options.Install && options.Quiet)
         {
             Setup.Installer.Install(new Setup.InstallOptions { LaunchAtStartup = options.Startup, LaunchNow = false }, msg => Log.Info(msg));
+            if (options.Relaunch) Setup.Installer.LaunchInstalled();
             Log.Flush();
             return 0;
         }

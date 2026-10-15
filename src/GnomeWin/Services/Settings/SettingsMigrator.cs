@@ -56,6 +56,15 @@ public sealed class SettingsMigrator
             root["Overview"] = overview;
             overview["HotCorner"] = false;
         });
+        m.Register(6, root =>
+        {
+            // Version 1 forced the panel mode on everyone and centring was on by default:
+            // the dock is a floating dock again unless the user turns the panel back on.
+            var dock = root["Dock"] as JsonObject ?? new JsonObject();
+            root["Dock"] = dock;
+            dock["Extended"] = false;
+            dock["CenterIcons"] = false;
+        });
         return m;
     }
 

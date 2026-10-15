@@ -22,6 +22,9 @@ public sealed class AppGridView : Grid
     private const double MaxSpacing = 36;
     private const double TileWidth = 128, TileHeight = 128;
     private const double SideMargin = 60;
+    // Below that the page is too small to hold a single tile: building it there would cache a layout
+    // whose cells stay tiny once the real size arrives.
+    private const double MinPageSize = 120;
 
     private readonly Grid _viewport = new() { ClipToBounds = true };
     private readonly StackPanel _strip = new() { Orientation = Orientation.Horizontal };
@@ -32,7 +35,8 @@ public sealed class AppGridView : Grid
     private IReadOnlyList<AppEntry> _apps = Array.Empty<AppEntry>();
     private (int Rows, int Columns) _mode = (3, 8);
     private int _page, _pageCount = 1, _selected = -1;
-    private double _pageWidth;
+    private double _pageWidth, _pageHeight;
+    private bool _dirty = true;
     private Point _press;
     private AppEntry? _pressedApp;
 
@@ -62,22 +66,31 @@ public sealed class AppGridView : Grid
         _apps = apps;
         _selected = -1;
         _page = 0;
+        _dirty = true;
         Rebuild();
     }
 
     private void Rebuild()
     {
         double w = ActualWidth - SideMargin * 2, h = ActualHeight - 40;
-        if (w <= 0 || h <= 0) return;
+        if (w < MinPageSize || h < MinPageSize) return;
         var mode = GridModes.OrderBy(m => Math.Abs((double)m.Columns / m.Rows - w / h)).First();
         int perPage = mode.Rows * mode.Columns;
         int pages = Math.Max(1, (int)Math.Ceiling(_apps.Count / (double)perPage));
-        bool sameLayout = mode == _mode && pages == _pageCount && Math.Abs(w - _pageWidth) < 0.5 && _tiles.Count == _apps.Count;
-        if (sameLayout) return;
+        bool sameLayout = !_dirty && mode == _mode && pages == _pageCount && _tiles.Count == _apps.Count
+                          && Math.Abs(w - _pageWidth) < 0.5 && Math.Abs(h - _pageHeight) < 0.5;
+        if (sameLayout)
+        {
+            // The pages are still valid, but a transform left over from an interrupted page change is not.
+            ShowPage(_page, animate: false);
+            return;
+        }
 
+        _dirty = false;
         _mode = mode;
         _pageCount = pages;
         _pageWidth = w;
+        _pageHeight = h;
         _tiles.Clear();
         _strip.Children.Clear();
 
